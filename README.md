@@ -36,6 +36,7 @@ src/
  │   └── game_state.py       # Snapshot of the current battlefield.
  └── engine/
      └── combat_engine.py    # Turn processor and event resolution.
+```
 💻 Tech Stack
 
 Python 3.x
