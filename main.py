@@ -1,6 +1,6 @@
-from src.ai.evaluator import ActionEvaluator
 from src.game.entities import Unit
 from src.game.game_state import GameState
+from src.simulation.combat_engine import CombatEngine
 
 def main():
     soldier = Unit(
@@ -13,29 +13,27 @@ def main():
     )
 
     enemies = [
-        Unit("Sectoid", 4, 65, 2, 5, True),
-        Unit("Trooper", 6, 60, 3, 6, True)
+        Unit("Sectoid", 5, 65, 2, 5, True),
+        Unit("Trooper", 6, 60, 3, 7, True)
     ]
 
     game_state = GameState(soldier, enemies)
-    evaluator = ActionEvaluator()
+    engine = CombatEngine(game_state)
 
-    best_action = evaluator.choose_best_action(game_state)
+    turn = 1
 
-    print("Action selected by AI:")
-    print("Type:", best_action.action_type)
-    print("Target:", best_action.target_name)
-    print("Destination:", best_action.destination)
-    print("Score:", best_action.score)
+    while not engine.battle_over():
+        print("\n----- TURN", turn, "-----")
 
-    print("\nEnemy analysis:")
-    for enemy in enemies:
-        hit_chance = evaluator.estimate_hit_chance(soldier, enemy)
-        distance = soldier.distance_to(enemy)
-        print(f"{enemy.name} -> distance: {distance}, estimated hit chance: {hit_chance}")
+        engine.run_turn()
 
-    print("\nMovement analysys:")
-    for action in evaluator.generate_movement_actions(soldier, enemies):
-        print(f"Move to {action.destination} -> score: {action.score}")
+        turn += 1
+        
+        if turn > 10:
+            break
+
+        print("\nBattle ended")
+   
+   
 if __name__ == "__main__":
     main()
