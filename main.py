@@ -18,7 +18,6 @@ def main():
     ]
 
     game_state = GameState(soldier, enemies)
-
     evaluator = ActionEvaluator()
 
     best_action = evaluator.choose_best_action(game_state)
@@ -26,6 +25,7 @@ def main():
     print("Action selected by AI:")
     print("Type:", best_action.action_type)
     print("Target:", best_action.target_name)
+    print("Destination:", best_action.destination)
     print("Score:", best_action.score)
 
     print("\nEnemy analysis:")
@@ -34,5 +34,8 @@ def main():
         distance = soldier.distance_to(enemy)
         print(f"{enemy.name} -> distance: {distance}, estimated hit chance: {hit_chance}")
 
+    print("\nMovement analysys:")
+    for action in evaluator.generate_movement_actions(soldier, enemies):
+        print(f"Move to {action.destination} -> score: {action.score}")
 if __name__ == "__main__":
     main()
