@@ -37,13 +37,13 @@ src/
  └── engine/
      └── combat_engine.py    # Turn processor and event resolution.
 ```
-💻 Tech Stack
+##💻 Tech Stack
 
 Python 3.x
 
 Pytest
 
-📈 Project Status & Roadmap
+##📈 Project Status & Roadmap
 
 This project is currently in the Core Logic Development Phase.
 
@@ -53,7 +53,7 @@ This project is currently in the Core Logic Development Phase.
 
  AI agent decision-making logic
 
-Planned improvements:
+##Planned improvements:
 
  Cover evaluation and tactical positioning
 
@@ -61,7 +61,7 @@ Planned improvements:
 
  External integration with a tactical game environment
 
-🧠 Technical Motivation
+##🧠 Technical Motivation
 
 This project focuses on exploring core challenges in game AI:
 
@@ -74,13 +74,13 @@ Maintaining a clear separation between Perception (Game State) and Decision (Eva
 Utility Algorithms
 Using heuristic scoring systems to drive decision-making in strategy games.
 
-🔧 How to Run
+##🔧 How to Run
 
 To see the AI decision logs in the terminal:
 
 python main.py
 
-Example Output
+##Example Output
 ----- TURN 1 -----
 
 AI decision: shoot
