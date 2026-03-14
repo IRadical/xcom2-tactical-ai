@@ -1,109 +1,150 @@
-# Tactical AI Decision System (XCOM-style Combat)
+# Tactical AI Decision System (XCOM-Style Combat)
 
-A Python-based AI agent exploring tactical decision-making and game state evaluation, inspired by the mechanics of XCOM-style turn-based combat.
+A Python-based AI agent focused on tactical decision-making and game state evaluation, inspired by the mechanics of XCOM-style turn-based combat.
 
-The goal of this project is to build an intelligent agent capable of analyzing complex combat scenarios, evaluating multiple lines of action, and selecting the optimal move based on a **Utility-based Scoring Model**.
-
----
-
-## 🚀 Key Features
-
-**Action Evaluation System**  
-A logic engine that weights options such as shooting, moving, or reloading.
-
-**Probability Estimation**  
-Dynamic calculation of hit chance based on game state variables.
-
-**Combat Simulation**  
-A core engine that processes turn-based events, damage, and entity health.
-
-**Scoring-based Selection**  
-The AI prioritizes actions with the highest tactical value rather than random selection.
+The purpose of this project is to build an intelligent agent capable of analyzing combat scenarios, evaluating multiple possible actions, and selecting the most effective move using a **utility-based scoring model**.
 
 ---
 
-## 🏗️ Project Architecture
+## Overview
 
-The codebase follows **Object-Oriented Design (OOD)** principles to ensure the AI logic is decoupled from the game rules.
+This project explores how an AI can make decisions in a turn-based tactical environment by scoring available actions such as attacking, moving, or reloading.
+
+Instead of choosing randomly, the agent evaluates the current battlefield state and prioritizes the action with the highest tactical value.
+
+---
+
+## Key Features
+
+### Action Evaluation System
+A decision-making engine that scores available actions such as shooting, moving, and reloading.
+
+### Probability Estimation
+Dynamic hit chance calculation based on combat context and game state conditions.
+
+### Combat Simulation
+A simulation core that handles turn flow, damage resolution, and unit health updates.
+
+### Scoring-Based Selection
+The AI selects actions based on tactical utility rather than random behavior.
+
+---
+
+## Project Architecture
+
+The codebase follows **Object-Oriented Design (OOD)** principles to keep decision logic separated from game rules and combat execution.
 
 ```text
 src/
  ├── ai/
- │   └── evaluator.py        # The "Brain": Scoring logic and decision making.
+ │   └── evaluator.py        # AI scoring logic and decision-making
  ├── game/
- │   ├── actions.py          # Action definitions (Shoot, Move, Reload).
- │   ├── entities.py         # Unit modeling (Soldiers, Aliens, Stats).
- │   └── game_state.py       # Snapshot of the current battlefield.
+ │   ├── actions.py          # Action definitions (Shoot, Move, Reload)
+ │   ├── entities.py         # Unit models (Soldiers, Aliens, Stats)
+ │   └── game_state.py       # Current battlefield snapshot
  └── engine/
-     └── combat_engine.py    # Turn processor and event resolution.
+     └── combat_engine.py    # Turn processing and event resolution
 ```
-## 💻 Tech Stack
 
-Python 3.x
+---
 
-Pytest
+## Tech Stack
 
-## 📈 Project Status & Roadmap
+- Python 3.x
+- Pytest
 
-This project is currently in the Core Logic Development Phase.
+---
 
- Basic combat simulation and turn flow
+## Project Status
 
- Action scoring (Utility) system
+This project is currently in the **Core Logic Development Phase**.
 
- AI agent decision-making logic
+### Implemented
 
-##Planned improvements:
+- Basic combat simulation and turn flow
+- Utility-based action scoring
+- AI agent decision-making logic
 
- Cover evaluation and tactical positioning
+### Planned Improvements
 
- Flanking logic and multi-enemy scenarios
+- Cover evaluation and tactical positioning
+- Flanking logic and multi-enemy scenarios
+- Integration with an external tactical game environment
 
- External integration with a tactical game environment
+---
 
-##🧠 Technical Motivation
+## Technical Motivation
 
-This project focuses on exploring core challenges in game AI:
+This project explores key challenges in game AI development.
 
-Tactical AI Systems
-Modeling intelligent behavior in environments with high uncertainty (RNG).
+### Tactical AI Systems
 
-Software Architecture
-Maintaining a clear separation between Perception (Game State) and Decision (Evaluator).
+Modeling intelligent behavior in environments with uncertainty and probability-based outcomes.
 
-Utility Algorithms
-Using heuristic scoring systems to drive decision-making in strategy games.
+### Software Architecture
 
-##🔧 How to Run
+Maintaining a clear separation between **Perception (Game State)** and **Decision-Making (Evaluator)**.
 
-To see the AI decision logs in the terminal:
+### Utility Algorithms
 
+Applying heuristic scoring systems to drive decision-making in tactical strategy environments.
+
+---
+
+## How to Run
+
+Run the following command to execute the simulation and see the AI decisions in the terminal:
+
+```bash
 python main.py
+```
 
-##Example Output
+---
+
+## Example Output
+
+```text
 ----- TURN 1 -----
 
-AI decision: shoot
+AI decision: shoot  
 Hit! Sectoid takes 5 damage (hp=0)
 
 Battle ended
 
 ----- TURN 2 -----
 
-AI decision: shoot
+AI decision: shoot  
 Hit! Trooper takes 3 damage (hp=3)
 
 Battle ended
 
 ----- TURN 3 -----
 
-AI decision: shoot
+AI decision: shoot  
 Hit! Trooper takes 4 damage (hp=-1)
 
 Battle ended
 
-AI decision: shoot
+AI decision: shoot  
 Hit! Sectoid takes 4 damage (hp=1)
 
 Battle ended
 ```
+
+---
+
+## Future Goals
+
+The long-term goal is to evolve this project into a more advanced tactical AI system capable of handling:
+
+- Positioning strategy
+- Threat analysis
+- Multi-target evaluation
+- Advanced combat heuristics
+- Integration with a tactical simulation or game environment
+
+---
+
+## Author
+
+Developed as a portfolio project focused on **Game AI, Decision Systems, and Tactical Simulation using Python**.
