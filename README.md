@@ -37,13 +37,13 @@ src/
  └── engine/
      └── combat_engine.py    # Turn processor and event resolution.
 ```
-##💻 Tech Stack
+## 💻 Tech Stack
 
 Python 3.x
 
 Pytest
 
-##📈 Project Status & Roadmap
+## 📈 Project Status & Roadmap
 
 This project is currently in the Core Logic Development Phase.
 
