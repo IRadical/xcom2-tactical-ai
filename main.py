@@ -24,8 +24,9 @@ def main():
     best_action = evaluator.choose_best_action(game_state)
 
     print("Action selected by AI:")
-    print("Type", best_action.action_type)
+    print("Type:", best_action.action_type)
     print("Target:", best_action.target_name)
+    print("Score:", best_action.score)
 
 if __name__ == "__main__":
     main()
