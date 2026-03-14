@@ -28,5 +28,11 @@ def main():
     print("Target:", best_action.target_name)
     print("Score:", best_action.score)
 
+    print("\nEnemy analysis:")
+    for enemy in enemies:
+        hit_chance = evaluator.estimate_hit_chance(soldier, enemy)
+        distance = soldier.distance_to(enemy)
+        print(f"{enemy.name} -> distance: {distance}, estimated hit chance: {hit_chance}")
+
 if __name__ == "__main__":
     main()
