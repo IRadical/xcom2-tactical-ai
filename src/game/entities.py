@@ -8,6 +8,7 @@ class Unit:
     ammo: int
     position: int
     is_enemy: bool
+    cover: int = 0
 
     def is_alive(self) -> bool:
         return self.hp > 0

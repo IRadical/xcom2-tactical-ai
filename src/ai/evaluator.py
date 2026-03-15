@@ -4,11 +4,11 @@ from src.game.entities import Unit
 
 class ActionEvaluator:
     
-    def estimate_hit_chance(self, soldier: Unit, enemy: Unit) -> float:
-        distance = soldier.distance_to(enemy)
+    def estimate_hit_chance(self, attacker: Unit, target: Unit) -> float:
+        distance = attacker.distance_to(target)
         distance_penalty = distance * 5
-        raw_hit_chance = soldier.aim - distance_penalty
-
+        raw_hit_chance = attacker.aim - distance_penalty - target.cover
+       
         return max(0, min(100, raw_hit_chance))
     
     def score_shot(self, soldier: Unit, enemy: Unit) -> float:
@@ -29,31 +29,45 @@ class ActionEvaluator:
                 return 40
         return 5
     
-    def score_move(self, new_position: int, soldier: Unit, enemies: list[Unit]) -> float:
+    def get_cover_value_for_position(self, destination: int) -> int:
+        cover_map = {
+            -2:0,
+            -1:20,
+            0:0,
+            1:20,
+            2:40,
+            3:20,
+            4:40,
+            5:0,
+            6:20,
+            7:40,
+            8:20,
+            9:0,
+            10: 40,
+        }
+
+        return cover_map.get(destination, 0)
+    
+    def score_move(self, soldier: Unit, enemies: list[Unit], destination: int) -> float:
         if not enemies:
             return 0
         
-        projected_soldier = Unit(
-            name=soldier.name,
-            hp=soldier.hp,
-            aim=soldier.aim,
-            ammo=soldier.ammo,
-            position=new_position,
-            is_enemy=soldier.is_enemy
-        )
-
-        closest_distance = min(projected_soldier.distance_to(enemy) for enemy in enemies)
+        distances = [abs(destination - enemy.position) for enemy in enemies]
+        closest_distance = min(distances)
         
-        ideal_distance = 3
-        distance_score = max(0, 40 - abs(closest_distance - ideal_distance) * 10)
+        preferred_distance = 3
+        distance_to_preferred = abs(closest_distance - preferred_distance)
+        positioning_score = 60 - (distance_to_preferred * 10)
 
-        forward_bonus = 10 if new_position > soldier.position else 0
-        overexposure_penalty = -20 if closest_distance <= 1 else 0
+        cover_value = self.get_cover_value_for_position(destination)
+        cover_bonus = cover_value * 1.5
 
-        return distance_score + forward_bonus + overexposure_penalty
+        movement_cost = abs(destination - soldier.position) * 2
+
+        return positioning_score + cover_bonus - movement_cost
     
     def generate_movement_actions(self, soldier: Unit, enemies: list[Unit]) -> list[Action]:
-        candidate_positions = [
+        possible_destinations = [
             soldier.position - 2,
             soldier.position - 1,
             soldier.position,
@@ -63,13 +77,13 @@ class ActionEvaluator:
 
         actions: list[Action] = []
 
-        for position in candidate_positions:
-            score = self.score_move(position, soldier, enemies)
+        for destination in possible_destinations:
+            move_score = self.score_move(soldier, enemies, destination)
             actions.append(
                 Action(
                     action_type="move",
-                    destination=position,
-                    score=score
+                    destination=destination,
+                    score=move_score
                 )
             )
         return actions
@@ -103,8 +117,7 @@ class ActionEvaluator:
             )
         )
 
-        movement_actions = self.generate_movement_actions(soldier, enemies)
-        possible_actions.extend(movement_actions)
+        possible_actions.extend(self.generate_movement_actions(soldier, enemies))
         
         return max(possible_actions, key=lambda action: action.score)
         
