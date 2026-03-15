@@ -9,9 +9,12 @@ class CombatEngine:
         self.verbose = verbose
 
     def resolve_shot(self, attacker, target) -> None:
-        hit_roll = random.randint(1, 100)
+        distance = attacker.distance_to(target)
+        distance_penalty = distance * 5
+        hit_chance = attacker.aim - distance_penalty - target.cover
+        hit_chance = max(0, min(100, hit_chance))
 
-        hit_chance = attacker.aim
+        hit_roll = random.randint(1, 100)
 
         if hit_roll <= hit_chance:
             damage = random.randint(2, 4)
@@ -19,12 +22,16 @@ class CombatEngine:
             target.hp = max(0, target.hp)
 
             if self.verbose:
-                print(f"{attacker.name} hits {target.name} for {damage} damage (hp={target.hp})")
-
+                print(
+                    f"{attacker.name} hits {target.name} for {damage} damage"
+                    f"(hp={target.hp}, target cover={target.cover}, hit chance={hit_chance})"
+                )
         else:
-
             if self.verbose:
-                print(f"{attacker.name} missed {target.name}")
+                print(
+                    f"{attacker.name} missed {target.name}"
+                    f"(target cover={target.cover}, hit chance={hit_chance})"
+                )
 
     def player_turn(self):
         soldier = self.game_state.soldier
@@ -51,9 +58,10 @@ class CombatEngine:
             
         elif action.action_type == "move":
             soldier.position = action.destination
+            soldier.cover = self.evaluator.get_cover_value_for_position(action.destination)
 
             if self.verbose:
-                print(f"Soldier moves to {action.destination}")
+                print(f"Soldier moves to {action.destination} and gains cover {soldier.cover}")
     
     def enemy_turn(self):
         soldier = self.game_state.soldier

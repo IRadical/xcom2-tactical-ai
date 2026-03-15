@@ -12,12 +12,15 @@ class CombatAnalytics:
             aim=75,
             ammo=3,
             position=0,
-            is_enemy=False
+            is_enemy=False,
+            cover=0,
         )
 
         enemies = [
-            Unit("Sectoid", random.randint(4, 6), 65, 2, random.randint(4, 7), True),
-            Unit("Trooper", random.randint(5, 7), 60, 3, random.randint(5, 9), True)
+            Unit("Sectoid", random.randint(4, 6), 65, 2, random.randint(4, 7), True,
+                 cover=random.choice([0,20])),
+            Unit("Trooper", random.randint(5, 7), 60, 3, random.randint(5, 9), True,
+                 cover=random.choice([0,20]))
         ]
 
         game_state = GameState(soldier, enemies)
