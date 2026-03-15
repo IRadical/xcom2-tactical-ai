@@ -16,6 +16,7 @@ class CombatEngine:
         if hit_roll <= hit_chance:
             damage = random.randint(2, 4)
             target.hp -= damage
+            target.hp = max(0, target.hp)
 
             if self.verbose:
                 print(f"{attacker.name} hits {target.name} for {damage} damage (hp={target.hp})")
