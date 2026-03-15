@@ -8,44 +8,84 @@ class CombatEngine:
         self.evaluator = ActionEvaluator()
         self.verbose = verbose
 
-    def resolve_shot(self, target) -> None:
+    def resolve_shot(self, attacker, target) -> None:
         hit_roll = random.randint(1, 100)
 
-        if hit_roll <= 70:
-            damage = random.randint(3, 5)
-            target.hp -= damage
-            print(f"Hit! {target.name} takes {damage} damage (hp={target.hp})")
-        else:
-            print("Shot missed!")
+        hit_chance = attacker.aim
 
-    def run_turn (self) -> None:
+        if hit_roll <= hit_chance:
+            damage = random.randint(2, 4)
+            target.hp -= damage
+
+            if self.verbose:
+                print(f"{attacker.name} hits {target.name} for {damage} damage (hp={target.hp})")
+
+        else:
+
+            if self.verbose:
+                print(f"{attacker.name} missed {target.name}")
+
+    def player_turn(self):
         soldier = self.game_state.soldier
         action = self.evaluator.choose_best_action(self.game_state)
 
-        print("\nAI decision:", action.action_type)
-
+        if self.verbose:
+            print("\nAI decision:", action.action_type)
+        
         if action.action_type == "shoot":
-            target = next(
+            targets = [
                 enemy for enemy in self.game_state.enemies
-                if enemy.name == action.target_name
-            )
+                if enemy.is_alive() and enemy.name == action.target_name
+            ]
 
-            if soldier.ammo > 0:
+            if targets and soldier.ammo > 0:
                 soldier.ammo -= 1
-                self.resolve_shot(target)
+                self.resolve_shot(soldier, targets[0])
+        
+        elif action.action_type == "reload":
+            soldier.amoo = 3
 
-            elif action.action_type == "reload":
-                soldier.ammo = 3
-                print("Reloaded weapon")
+            if self.verbose:
+                print ("Soldier reloads weapon")
+            
+        elif action.action_type == "move":
+            soldier.position = action.destination
 
-            elif action.action_type == "move":
-                soldier.position = action.destination
-                print(f"Moved to position {action.destination}")
+            if self.verbose:
+                print(f"Soldier moves to {action.destination}")
+    
+    def enemy_turn(self):
+        soldier = self.game_state.soldier
+
+        for enemy in self.game_state.enemies:
+            
+            if not enemy.is_alive():
+                continue
+            
+            if self.verbose:
+                print(f"{enemy.name} attacks")
+            
+            self.resolve_shot(enemy, soldier)
+
+            if soldier.hp <= 0:
+                if self.verbose:
+                    print("Soldier has been eliminated")
+                return
+            
+
+    def run_turn (self):
+       self.player_turn()
+
+       if self.game_state.soldier.hp <= 0:
+           return
+       
+       self.enemy_turn()
         
     def battle_over(self) -> bool:
+        soldier_alive = self.game_state.soldier.hp > 0
         enemies_alive = [
             enemy for enemy in self.game_state.enemies
             if enemy.is_alive()
         ]
 
-        return len(enemies_alive) == 0
+        return not soldier_alive or len(enemies_alive) == 0
