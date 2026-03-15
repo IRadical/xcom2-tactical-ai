@@ -3,11 +3,12 @@ from src.ai.evaluator import ActionEvaluator
 import random
 
 class CombatEngine:
-    def __init__(self, game_state: GameState):
+    def __init__(self, game_state: GameState, verbose: bool = True):
         self.game_state = game_state
         self.evaluator = ActionEvaluator()
+        self.verbose = verbose
 
-    def resolve_shot(self, target):
+    def resolve_shot(self, target) -> None:
         hit_roll = random.randint(1, 100)
 
         if hit_roll <= 70:
@@ -17,7 +18,7 @@ class CombatEngine:
         else:
             print("Shot missed!")
 
-    def run_turn (self):
+    def run_turn (self) -> None:
         soldier = self.game_state.soldier
         action = self.evaluator.choose_best_action(self.game_state)
 
@@ -41,7 +42,7 @@ class CombatEngine:
                 soldier.position = action.destination
                 print(f"Moved to position {action.destination}")
         
-    def battle_over(self):
+    def battle_over(self) -> bool:
         enemies_alive = [
             enemy for enemy in self.game_state.enemies
             if enemy.is_alive()
