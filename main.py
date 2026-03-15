@@ -32,7 +32,7 @@ def main():
         if turn > 10:
             break
 
-        print("\nBattle ended")
+        print("\nTurn ended")
    
    
 if __name__ == "__main__":
