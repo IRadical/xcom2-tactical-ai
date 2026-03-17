@@ -13,31 +13,37 @@ class ActionEvaluator:
     def score_shot(self, soldier: Unit, enemy: Unit) -> float:
         hit_chance = self.estimate_hit_chance(soldier, enemy)
 
-        kill_bonus = 140 if enemy.hp <= 4 else 0
-        low_hp_bonus = max(0, 10 - enemy.hp) * 7
+        kill_bonus = 200 if enemy.hp <= 4 else 0
+        wounded_target_bonus = max(0, 12 - enemy.hp) * 10
         close_range_bonus = 20 if soldier.distance_to(enemy) <= 4 else 0
 
-        return (hit_chance * 2.2) + kill_bonus + low_hp_bonus + close_range_bonus
+        low_acurracy_penalty = 0
+        if hit_chance < 30:
+            low_acurracy_penalty = 35
+        elif hit_chance < 40:
+            low_acurracy_penalty = 15
+        return (hit_chance * 2.4) + kill_bonus + wounded_target_bonus + low_acurracy_penalty
 
     def score_reload(self, soldier: Unit, enemies: list[Unit]) -> float:
         if soldier.ammo == 0:
-            return 70
+            return 65
 
         if soldier.ammo == 1:
             if not enemies:
-                return 15
+                return 10
 
             best_hit_chance = max(
                 self.estimate_hit_chance(soldier, enemy)
                 for enemy in enemies
             )
+        
 
-            if best_hit_chance < 25:
-                return 20
+            if best_hit_chance < 20:
+                return 15
 
-            return -20
+            return -30
 
-        return -30
+        return -40
 
     def get_cover_value_for_position(self, destination: int) -> int:
         cover_map = {
@@ -67,10 +73,10 @@ class ActionEvaluator:
         preferred_distance = 3
         distance_to_preferred = abs(closest_distance - preferred_distance)
 
-        positioning_score = 35 - (distance_to_preferred * 6)
+        positioning_score = 24 - (distance_to_preferred * 6)
 
         cover_value = self.get_cover_value_for_position(destination)
-        cover_bonus = cover_value * 0.9
+        cover_bonus = cover_value * 0.8
 
         movement_cost = abs(destination - soldier.position) * 2
 
