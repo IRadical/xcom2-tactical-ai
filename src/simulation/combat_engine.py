@@ -8,6 +8,20 @@ class CombatEngine:
         self.evaluator = ActionEvaluator()
         self.verbose = verbose
 
+        self.metrics = {
+            "shots_fired": 0,
+            "shots_hit" : 0,
+            "damage_dealt": 0,
+            "damage_taken": 0,
+            "kills": 0,
+            "action_counts": {
+                "shoot": 0,
+                "reload": 0,
+                "move": 0,
+                "wait": 0,
+            },
+        }
+
     def resolve_shot(self, attacker, target) -> None:
         distance = attacker.distance_to(target)
         distance_penalty = distance * 5
@@ -16,10 +30,25 @@ class CombatEngine:
 
         hit_roll = random.randint(1, 100)
 
+        if attacker.is_enemy:
+            self.metrics["damage_taken"] += 0
+        else:
+            self.metrics["shots_fired"] +=1
+
         if hit_roll <= hit_chance:
             damage = random.randint(2, 4)
+            previous_hp = target.hp
             target.hp -= damage
             target.hp = max(0, target.hp)
+            actual_damage = previous_hp - target.hp
+
+            if attacker.is_enemy:
+                self.metrics["damage_taken"] += actual_damage
+            else:
+                self.metrics["shots_hit"] += 1
+                self.metrics["damage_dealt"] += actual_damage
+                if not target.is_alive():
+                    self.metrics["kills"] += 1
 
             if self.verbose:
                 print(
@@ -33,9 +62,12 @@ class CombatEngine:
                     f"(target cover={target.cover}, hit chance={hit_chance})"
                 )
 
-    def player_turn(self):
+    def player_turn(self) -> None:
         soldier = self.game_state.soldier
         action = self.evaluator.choose_best_action(self.game_state)
+
+        if action.action_type in self.metrics["action_counts"]:
+            self.metrics["action_counts"][action.action_type] += 1
 
         if self.verbose:
             print("\nAI decision:", action.action_type)
