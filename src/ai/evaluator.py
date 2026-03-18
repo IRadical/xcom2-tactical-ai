@@ -13,35 +13,32 @@ class ActionEvaluator:
     def score_shot(self, soldier: Unit, enemy: Unit) -> float:
         hit_chance = self.estimate_hit_chance(soldier, enemy)
 
-        kill_bonus = 200 if enemy.hp <= 4 else 0
-        wounded_target_bonus = max(0, 12 - enemy.hp) * 10
-        close_range_bonus = 20 if soldier.distance_to(enemy) <= 4 else 0
+        kill_bonus = 180 if enemy.hp <= 4 else 0
+        wounded_target_bonus = max(0, 12 - enemy.hp) * 8
+        close_range_bonus = 15 if soldier.distance_to(enemy) <= 4 else 0
 
-        low_acurracy_penalty = 0
-        if hit_chance < 30:
-            low_acurracy_penalty = 35
-        elif hit_chance < 40:
-            low_acurracy_penalty = 15
-        return (hit_chance * 2.4) + kill_bonus + wounded_target_bonus + low_acurracy_penalty
+        low_accuracy_penalty = 0
+        if hit_chance < 25:
+            low_accuracy_penalty = 50
+        elif hit_chance < 35:
+            low_accuracy_penalty = 20
 
-    def score_reload(self, soldier: Unit, enemies: list[Unit]) -> float:
+        return (
+            (hit_chance * 2.0)
+            + kill_bonus
+            + wounded_target_bonus
+            + close_range_bonus
+            - low_accuracy_penalty
+        )
+
+    def score_reload(self, soldier: Unit, best_hit_chance: float) -> float:
         if soldier.ammo == 0:
-            return 65
+            return 100
 
         if soldier.ammo == 1:
-            if not enemies:
-                return 10
-
-            best_hit_chance = max(
-                self.estimate_hit_chance(soldier, enemy)
-                for enemy in enemies
-            )
-        
-
             if best_hit_chance < 20:
-                return 15
-
-            return -30
+                return 35
+            return -25
 
         return -40
 
@@ -63,7 +60,13 @@ class ActionEvaluator:
         }
         return cover_map.get(destination, 0)
 
-    def score_move(self, soldier: Unit, enemies: list[Unit], destination: int) -> float:
+    def score_move(
+        self,
+        soldier: Unit,
+        enemies: list[Unit],
+        destination: int,
+        current_best_hit_chance: float,
+    ) -> float:
         if not enemies:
             return 0
 
@@ -72,8 +75,7 @@ class ActionEvaluator:
 
         preferred_distance = 3
         distance_to_preferred = abs(closest_distance - preferred_distance)
-
-        positioning_score = 24 - (distance_to_preferred * 6)
+        positioning_score = 26 - (distance_to_preferred * 5)
 
         cover_value = self.get_cover_value_for_position(destination)
         cover_bonus = cover_value * 0.8
@@ -84,9 +86,26 @@ class ActionEvaluator:
         if soldier.hp <= 4:
             survival_bonus = cover_value * 1.2
 
-        return positioning_score + cover_bonus + survival_bonus - movement_cost
+        shot_quality_bonus = 0
+        if current_best_hit_chance < 25:
+            shot_quality_bonus = 20
+        elif current_best_hit_chance < 35:
+            shot_quality_bonus = 8
 
-    def generate_move_actions(self, soldier: Unit, enemies: list[Unit]) -> list[Action]:
+        return (
+            positioning_score
+            + cover_bonus
+            + survival_bonus
+            + shot_quality_bonus
+            - movement_cost
+        )
+
+    def generate_move_actions(
+        self,
+        soldier: Unit,
+        enemies: list[Unit],
+        current_best_hit_chance: float,
+    ) -> list[Action]:
         possible_destinations = [
             soldier.position - 2,
             soldier.position - 1,
@@ -97,7 +116,12 @@ class ActionEvaluator:
         actions: list[Action] = []
 
         for destination in possible_destinations:
-            move_score = self.score_move(soldier, enemies, destination)
+            move_score = self.score_move(
+                soldier,
+                enemies,
+                destination,
+                current_best_hit_chance,
+            )
             actions.append(
                 Action(
                     action_type="move",
@@ -112,15 +136,15 @@ class ActionEvaluator:
         soldier = game_state.soldier
         enemies = game_state.living_enemies()
 
-        possible_actions: list[Action] = []
-
         if not enemies:
             return Action(action_type="wait", score=0)
+
+        shot_actions: list[Action] = []
 
         for enemy in enemies:
             if soldier.ammo > 0:
                 shot_score = self.score_shot(soldier, enemy)
-                possible_actions.append(
+                shot_actions.append(
                     Action(
                         action_type="shoot",
                         target_name=enemy.name,
@@ -128,13 +152,28 @@ class ActionEvaluator:
                     )
                 )
 
+        best_hit_chance = 0.0
+        if enemies:
+            best_hit_chance = max(
+                self.estimate_hit_chance(soldier, enemy)
+                for enemy in enemies
+            )
+
+        if soldier.ammo > 0 and shot_actions and best_hit_chance >= 45:
+            return max(shot_actions, key=lambda action: action.score)
+
+        possible_actions: list[Action] = []
+        possible_actions.extend(shot_actions)
+
         possible_actions.append(
             Action(
                 action_type="reload",
-                score=self.score_reload(soldier, enemies),
+                score=self.score_reload(soldier, best_hit_chance),
             )
         )
 
-        possible_actions.extend(self.generate_move_actions(soldier, enemies))
+        possible_actions.extend(
+            self.generate_move_actions(soldier, enemies, best_hit_chance)
+        )
 
         return max(possible_actions, key=lambda action: action.score)
