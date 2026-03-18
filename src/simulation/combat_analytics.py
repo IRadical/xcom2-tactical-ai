@@ -10,7 +10,7 @@ class CombatAnalytics:
             name="Ranger",
             hp=10,
             aim=75,
-            ammo=3,
+            ammo=6,
             position=0,
             is_enemy=False,
             cover=0,

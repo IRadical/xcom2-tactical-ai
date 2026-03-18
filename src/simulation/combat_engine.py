@@ -83,7 +83,7 @@ class CombatEngine:
                 self.resolve_shot(soldier, targets[0])
         
         elif action.action_type == "reload":
-            soldier.amoo = 3
+            soldier.amoo = 6
 
             if self.verbose:
                 print ("Soldier reloads weapon")

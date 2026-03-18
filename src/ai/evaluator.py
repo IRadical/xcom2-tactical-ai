@@ -36,11 +36,11 @@ class ActionEvaluator:
             return 100
 
         if soldier.ammo == 1:
-            if best_hit_chance < 20:
-                return 35
-            return -25
+            if best_hit_chance < 15:
+                return 8
+            return -35
 
-        return -40
+        return -50
 
     def get_cover_value_for_position(self, destination: int) -> int:
         cover_map = {
@@ -84,13 +84,13 @@ class ActionEvaluator:
 
         survival_bonus = 0
         if soldier.hp <= 4:
-            survival_bonus = cover_value * 1.2
+            survival_bonus = cover_value * 1.3
 
         shot_quality_bonus = 0
-        if current_best_hit_chance < 25:
-            shot_quality_bonus = 20
-        elif current_best_hit_chance < 35:
-            shot_quality_bonus = 8
+        if current_best_hit_chance < 20:
+            shot_quality_bonus = 30
+        elif current_best_hit_chance < 30:
+            shot_quality_bonus = 15
 
         return (
             positioning_score
@@ -161,6 +161,9 @@ class ActionEvaluator:
 
         if soldier.ammo > 0 and shot_actions and best_hit_chance >= 45:
             return max(shot_actions, key=lambda action: action.score)
+        
+        if soldier.ammo == 0:
+            return Action(action_type="reload", score=100)
 
         possible_actions: list[Action] = []
         possible_actions.extend(shot_actions)
