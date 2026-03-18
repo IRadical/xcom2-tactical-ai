@@ -4,10 +4,18 @@ from src.game.entities import Unit
 
 
 class ActionEvaluator:
+    def is_flanked(self, attacker: Unit, target: Unit) -> bool:
+        return attacker.distance_to(target) <= 2 and target.cover > 0
+
     def estimate_hit_chance(self, attacker: Unit, target: Unit) -> float:
         distance = attacker.distance_to(target)
         distance_penalty = distance * 5
-        raw_hit_chance = attacker.aim - distance_penalty - target.cover
+
+        effective_cover = target.cover
+        if self.is_flanked(attacker, target):
+            effective_cover = 0
+
+        raw_hit_chance = attacker.aim - distance_penalty - effective_cover
         return max(0, min(100, raw_hit_chance))
 
     def score_shot(self, soldier: Unit, enemy: Unit) -> float:
@@ -16,6 +24,7 @@ class ActionEvaluator:
         kill_bonus = 180 if enemy.hp <= 4 else 0
         wounded_target_bonus = max(0, 12 - enemy.hp) * 8
         close_range_bonus = 15 if soldier.distance_to(enemy) <= 4 else 0
+        flank_bonus = 50 if self.is_flanked(soldier, enemy) else 0
 
         low_accuracy_penalty = 0
         if hit_chance < 25:
@@ -28,6 +37,7 @@ class ActionEvaluator:
             + kill_bonus
             + wounded_target_bonus
             + close_range_bonus
+            + flank_bonus
             - low_accuracy_penalty
         )
 
@@ -75,10 +85,10 @@ class ActionEvaluator:
 
         preferred_distance = 3
         distance_to_preferred = abs(closest_distance - preferred_distance)
-        positioning_score = 26 - (distance_to_preferred * 5)
+        positioning_score = 28 - (distance_to_preferred * 5)
 
         cover_value = self.get_cover_value_for_position(destination)
-        cover_bonus = cover_value * 0.8
+        cover_bonus = cover_value * 0.9
 
         movement_cost = abs(destination - soldier.position) * 2
 
@@ -92,11 +102,18 @@ class ActionEvaluator:
         elif current_best_hit_chance < 30:
             shot_quality_bonus = 15
 
+        flank_setup_bonus = 0
+        for enemy in enemies:
+            future_distance = abs(destination - enemy.position)
+            if future_distance <= 2 and enemy.cover > 0:
+                flank_setup_bonus = max(flank_setup_bonus, 25)
+
         return (
             positioning_score
             + cover_bonus
             + survival_bonus
             + shot_quality_bonus
+            + flank_setup_bonus
             - movement_cost
         )
 
@@ -152,16 +169,14 @@ class ActionEvaluator:
                     )
                 )
 
-        best_hit_chance = 0.0
-        if enemies:
-            best_hit_chance = max(
-                self.estimate_hit_chance(soldier, enemy)
-                for enemy in enemies
-            )
+        best_hit_chance = max(
+            self.estimate_hit_chance(soldier, enemy)
+            for enemy in enemies
+        )
 
         if soldier.ammo > 0 and shot_actions and best_hit_chance >= 45:
             return max(shot_actions, key=lambda action: action.score)
-        
+
         if soldier.ammo == 0:
             return Action(action_type="reload", score=100)
 
