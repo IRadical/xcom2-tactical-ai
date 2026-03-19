@@ -4,10 +4,23 @@ from src.game.entities import Unit
 
 
 class ActionEvaluator:
+    def has_line_of_sight(
+        self,
+        attacker: Unit,
+        target: Unit,
+    ) -> bool:
+        dx = abs(attacker.position[0] - target.position[0])
+        dy = abs(attacker.position[1] - target.position[1])
+
+        return not (dx > 4 and dy > 2)
+
     def is_flanked(self, attacker: Unit, target: Unit) -> bool:
         return attacker.distance_to(target) <= 2 and target.cover > 0
 
     def estimate_hit_chance(self, attacker: Unit, target: Unit) -> float:
+        if not self.has_line_of_sight(attacker, target):
+            return 0.0
+
         distance = attacker.distance_to(target)
         distance_penalty = distance * 5
 
@@ -31,7 +44,20 @@ class ActionEvaluator:
             if not enemy.is_alive():
                 continue
 
-            distance = abs(position[0] - enemy.position[0]) + abs(position[1] - enemy.position[1])
+            simulated_soldier = Unit(
+                name=soldier.name,
+                hp=soldier.hp,
+                aim=soldier.aim,
+                ammo=soldier.ammo,
+                position=position,
+                is_enemy=soldier.is_enemy,
+                cover=cover,
+            )
+
+            if not self.has_line_of_sight(enemy, simulated_soldier):
+                continue
+
+            distance = enemy.distance_to(simulated_soldier)
             distance_penalty = distance * 5
 
             effective_cover = cover
@@ -72,12 +98,15 @@ class ActionEvaluator:
         elif soldier.hp <= 7:
             threat_penalty = current_position_threat * 12
 
+        los_bonus = 10 if self.has_line_of_sight(soldier, enemy) else -100
+
         return (
             (hit_chance * 2.0)
             + kill_bonus
             + wounded_target_bonus
             + close_range_bonus
             + flank_bonus
+            + los_bonus
             - low_accuracy_penalty
             - threat_penalty
         )
@@ -150,6 +179,8 @@ class ActionEvaluator:
             shot_quality_bonus = 15
 
         flank_setup_bonus = 0.0
+        los_setup_bonus = 0.0
+
         for enemy in enemies:
             future_distance = (
                 abs(destination[0] - enemy.position[0])
@@ -157,6 +188,19 @@ class ActionEvaluator:
             )
             if future_distance <= 2 and enemy.cover > 0:
                 flank_setup_bonus = max(flank_setup_bonus, 18)
+
+            simulated_soldier = Unit(
+                name=soldier.name,
+                hp=soldier.hp,
+                aim=soldier.aim,
+                ammo=soldier.ammo,
+                position=destination,
+                is_enemy=soldier.is_enemy,
+                cover=cover_value,
+            )
+
+            if self.has_line_of_sight(simulated_soldier, enemy):
+                los_setup_bonus = max(los_setup_bonus, 12)
 
         destination_threat = self.estimate_position_threat(
             soldier=soldier,
@@ -185,6 +229,7 @@ class ActionEvaluator:
             + survival_bonus
             + shot_quality_bonus
             + flank_setup_bonus
+            + los_setup_bonus
             + threat_reduction_bonus
             - threat_penalty
             - movement_cost
@@ -233,9 +278,14 @@ class ActionEvaluator:
         if not enemies:
             return Action(action_type="wait", score=0)
 
+        visible_enemies = [
+            enemy for enemy in enemies
+            if self.has_line_of_sight(soldier, enemy)
+        ]
+
         shot_actions: list[Action] = []
 
-        for enemy in enemies:
+        for enemy in visible_enemies:
             if soldier.ammo > 0:
                 shot_score = self.score_shot(soldier, enemy, enemies)
                 shot_actions.append(
@@ -246,10 +296,12 @@ class ActionEvaluator:
                     )
                 )
 
-        best_hit_chance = max(
-            self.estimate_hit_chance(soldier, enemy)
-            for enemy in enemies
-        )
+        best_hit_chance = 0.0
+        if visible_enemies:
+            best_hit_chance = max(
+                self.estimate_hit_chance(soldier, enemy)
+                for enemy in visible_enemies
+            )
 
         if soldier.ammo > 0 and shot_actions and best_hit_chance >= 55:
             return max(shot_actions, key=lambda action: action.score)
