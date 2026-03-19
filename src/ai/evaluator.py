@@ -18,7 +18,40 @@ class ActionEvaluator:
         raw_hit_chance = attacker.aim - distance_penalty - effective_cover
         return max(0, min(100, raw_hit_chance))
 
-    def score_shot(self, soldier: Unit, enemy: Unit) -> float:
+    def estimate_position_threat(
+        self,
+        soldier: Unit,
+        enemies: list[Unit],
+        position: int,
+        cover: int,
+    ) -> float:
+        """
+        Estimate how dangerous a destination would be based on expected incoming fire.
+        Higher value = more dangerous.
+        """
+        total_threat = 0.0
+
+        for enemy in enemies:
+            if not enemy.is_alive():
+                continue
+
+            distance = abs(position - enemy.position)
+            distance_penalty = distance * 5
+
+            effective_cover = cover
+            if distance <= 2 and cover > 0:
+                # Simplified local flank risk: close enemies can neutralize cover
+                effective_cover = 0
+
+            estimated_enemy_hit = enemy.aim - distance_penalty - effective_cover
+            estimated_enemy_hit = max(0, min(100, estimated_enemy_hit))
+
+            threat_contribution = estimated_enemy_hit / 100.0
+            total_threat += threat_contribution
+
+        return total_threat
+
+    def score_shot(self, soldier: Unit, enemy: Unit, enemies: list[Unit]) -> float:
         hit_chance = self.estimate_hit_chance(soldier, enemy)
 
         kill_bonus = 180 if enemy.hp <= 4 else 0
@@ -32,6 +65,19 @@ class ActionEvaluator:
         elif hit_chance < 35:
             low_accuracy_penalty = 20
 
+        current_position_threat = self.estimate_position_threat(
+            soldier=soldier,
+            enemies=enemies,
+            position=soldier.position,
+            cover=soldier.cover,
+        )
+
+        threat_penalty = 0.0
+        if soldier.hp <= 4:
+            threat_penalty = current_position_threat * 25
+        elif soldier.hp <= 7:
+            threat_penalty = current_position_threat * 12
+
         return (
             (hit_chance * 2.0)
             + kill_bonus
@@ -39,15 +85,24 @@ class ActionEvaluator:
             + close_range_bonus
             + flank_bonus
             - low_accuracy_penalty
+            - threat_penalty
         )
 
-    def score_reload(self, soldier: Unit, best_hit_chance: float) -> float:
+    def score_reload(self, soldier: Unit, best_hit_chance: float, enemies: list[Unit]) -> float:
+        current_position_threat = self.estimate_position_threat(
+            soldier=soldier,
+            enemies=enemies,
+            position=soldier.position,
+            cover=soldier.cover,
+        )
+
         if soldier.ammo == 0:
-            return 100
+            # Reload is necessary, but dangerous if under heavy fire
+            return 100 - (current_position_threat * 10)
 
         if soldier.ammo == 1:
             if best_hit_chance < 15:
-                return 8
+                return 8 - (current_position_threat * 8)
             return -35
 
         return -50
@@ -92,21 +147,44 @@ class ActionEvaluator:
 
         movement_cost = abs(destination - soldier.position) * 2
 
-        survival_bonus = 0
+        survival_bonus = 0.0
         if soldier.hp <= 4:
-            survival_bonus = cover_value * 1.3
+            survival_bonus = cover_value * 1.5
+        elif soldier.hp <= 7:
+            survival_bonus = cover_value * 0.8
 
-        shot_quality_bonus = 0
+        shot_quality_bonus = 0.0
         if current_best_hit_chance < 20:
             shot_quality_bonus = 30
         elif current_best_hit_chance < 30:
             shot_quality_bonus = 15
 
-        flank_setup_bonus = 0
+        flank_setup_bonus = 0.0
         for enemy in enemies:
             future_distance = abs(destination - enemy.position)
             if future_distance <= 2 and enemy.cover > 0:
-                flank_setup_bonus = max(flank_setup_bonus, 25)
+                flank_setup_bonus = max(flank_setup_bonus, 18)
+
+        destination_threat = self.estimate_position_threat(
+            soldier=soldier,
+            enemies=enemies,
+            position=destination,
+            cover=cover_value,
+        )
+
+        current_threat = self.estimate_position_threat(
+            soldier=soldier,
+            enemies=enemies,
+            position=soldier.position,
+            cover=soldier.cover,
+        )
+
+        threat_reduction_bonus = max(0.0, current_threat - destination_threat) * 40
+        threat_penalty = destination_threat * 20
+
+        if soldier.hp <= 4:
+            threat_reduction_bonus *= 1.4
+            threat_penalty *= 1.5
 
         return (
             positioning_score
@@ -114,6 +192,8 @@ class ActionEvaluator:
             + survival_bonus
             + shot_quality_bonus
             + flank_setup_bonus
+            + threat_reduction_bonus
+            - threat_penalty
             - movement_cost
         )
 
@@ -160,7 +240,7 @@ class ActionEvaluator:
 
         for enemy in enemies:
             if soldier.ammo > 0:
-                shot_score = self.score_shot(soldier, enemy)
+                shot_score = self.score_shot(soldier, enemy, enemies)
                 shot_actions.append(
                     Action(
                         action_type="shoot",
@@ -174,7 +254,7 @@ class ActionEvaluator:
             for enemy in enemies
         )
 
-        if soldier.ammo > 0 and shot_actions and best_hit_chance >= 45:
+        if soldier.ammo > 0 and shot_actions and best_hit_chance >= 55:
             return max(shot_actions, key=lambda action: action.score)
 
         if soldier.ammo == 0:
@@ -186,7 +266,7 @@ class ActionEvaluator:
         possible_actions.append(
             Action(
                 action_type="reload",
-                score=self.score_reload(soldier, best_hit_chance),
+                score=self.score_reload(soldier, best_hit_chance, enemies),
             )
         )
 
