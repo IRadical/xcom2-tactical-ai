@@ -10,17 +10,31 @@ class CombatAnalytics:
             name="Ranger",
             hp=10,
             aim=75,
-            ammo=6,
-            position=0,
+            ammo=5,
+            position=(0, 0),
             is_enemy=False,
             cover=0,
         )
 
         enemies = [
-            Unit("Sectoid", random.randint(4, 6), 65, 2, random.randint(4, 7), True,
-                 cover=random.choice([0,20])),
-            Unit("Trooper", random.randint(5, 7), 60, 3, random.randint(5, 9), True,
-                 cover=random.choice([0,20]))
+            Unit(
+                "Sectoid",
+                random.randint(4, 6),
+                65,
+                2,
+                (random.randint(3, 6), random.randint(0, 3)),
+                True,
+                cover=random.choice([0, 20]),
+            ),
+            Unit(
+                "Trooper",
+                random.randint(5, 7),
+                60,
+                3,
+                (random.randint(4, 8), random.randint(1, 4)),
+                True,
+                cover=random.choice([0, 20]),
+            ),
         ]
 
         game_state = GameState(soldier, enemies)
@@ -45,7 +59,7 @@ class CombatAnalytics:
             "damage_dealt": metrics["damage_dealt"],
             "damage_taken": metrics["damage_taken"],
             "kills": metrics["kills"],
-            "action_counts": metrics["action_counts"]
+            "action_counts": metrics["action_counts"],
         }
 
     def run_simulation(self, battles: int = 100) -> dict:
@@ -58,7 +72,7 @@ class CombatAnalytics:
         total_damage_taken = 0
         total_kills = 0
 
-        total_actions_counts = {
+        total_action_counts = {
             "shoot": 0,
             "reload": 0,
             "move": 0,
@@ -76,15 +90,15 @@ class CombatAnalytics:
             total_shots_fired += result["shots_fired"]
             total_shots_hit += result["shots_hit"]
             total_damage_dealt += result["damage_dealt"]
-            total_damage_taken  += result["damage_taken"]
+            total_damage_taken += result["damage_taken"]
             total_kills += result["kills"]
 
             for action_name, count in result["action_counts"].items():
-                total_actions_counts[action_name] += count
-            
+                total_action_counts[action_name] += count
+
         accuracy = 0.0
         if total_shots_fired > 0:
-            accuracy = total_shots_hit / total_shots_fired           
+            accuracy = total_shots_hit / total_shots_fired
 
         return {
             "battles": battles,
@@ -95,5 +109,5 @@ class CombatAnalytics:
             "avg_damage_dealt": total_damage_dealt / battles,
             "avg_damage_taken": total_damage_taken / battles,
             "avg_kills": total_kills / battles,
-            "action_counts": total_actions_counts,
+            "action_counts": total_action_counts,
         }

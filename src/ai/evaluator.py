@@ -22,32 +22,26 @@ class ActionEvaluator:
         self,
         soldier: Unit,
         enemies: list[Unit],
-        position: int,
+        position: tuple[int, int],
         cover: int,
     ) -> float:
-        """
-        Estimate how dangerous a destination would be based on expected incoming fire.
-        Higher value = more dangerous.
-        """
         total_threat = 0.0
 
         for enemy in enemies:
             if not enemy.is_alive():
                 continue
 
-            distance = abs(position - enemy.position)
+            distance = abs(position[0] - enemy.position[0]) + abs(position[1] - enemy.position[1])
             distance_penalty = distance * 5
 
             effective_cover = cover
             if distance <= 2 and cover > 0:
-                # Simplified local flank risk: close enemies can neutralize cover
                 effective_cover = 0
 
             estimated_enemy_hit = enemy.aim - distance_penalty - effective_cover
             estimated_enemy_hit = max(0, min(100, estimated_enemy_hit))
 
-            threat_contribution = estimated_enemy_hit / 100.0
-            total_threat += threat_contribution
+            total_threat += estimated_enemy_hit / 100.0
 
         return total_threat
 
@@ -97,7 +91,6 @@ class ActionEvaluator:
         )
 
         if soldier.ammo == 0:
-            # Reload is necessary, but dangerous if under heavy fire
             return 100 - (current_position_threat * 10)
 
         if soldier.ammo == 1:
@@ -107,35 +100,29 @@ class ActionEvaluator:
 
         return -50
 
-    def get_cover_value_for_position(self, destination: int) -> int:
-        cover_map = {
-            -2: 0,
-            -1: 20,
-            0: 0,
-            1: 20,
-            2: 40,
-            3: 20,
-            4: 40,
-            5: 0,
-            6: 20,
-            7: 40,
-            8: 20,
-            9: 0,
-            10: 40,
-        }
-        return cover_map.get(destination, 0)
+    def get_cover_value_for_position(self, destination: tuple[int, int]) -> int:
+        x, y = destination
+
+        if (x + y) % 5 == 0:
+            return 40
+        if (x + y) % 2 == 0:
+            return 20
+        return 0
 
     def score_move(
         self,
         soldier: Unit,
         enemies: list[Unit],
-        destination: int,
+        destination: tuple[int, int],
         current_best_hit_chance: float,
     ) -> float:
         if not enemies:
             return 0
 
-        distances = [abs(destination - enemy.position) for enemy in enemies]
+        distances = [
+            abs(destination[0] - enemy.position[0]) + abs(destination[1] - enemy.position[1])
+            for enemy in enemies
+        ]
         closest_distance = min(distances)
 
         preferred_distance = 3
@@ -145,7 +132,10 @@ class ActionEvaluator:
         cover_value = self.get_cover_value_for_position(destination)
         cover_bonus = cover_value * 0.9
 
-        movement_cost = abs(destination - soldier.position) * 2
+        movement_cost = (
+            abs(destination[0] - soldier.position[0])
+            + abs(destination[1] - soldier.position[1])
+        ) * 2
 
         survival_bonus = 0.0
         if soldier.hp <= 4:
@@ -161,7 +151,10 @@ class ActionEvaluator:
 
         flank_setup_bonus = 0.0
         for enemy in enemies:
-            future_distance = abs(destination - enemy.position)
+            future_distance = (
+                abs(destination[0] - enemy.position[0])
+                + abs(destination[1] - enemy.position[1])
+            )
             if future_distance <= 2 and enemy.cover > 0:
                 flank_setup_bonus = max(flank_setup_bonus, 18)
 
@@ -203,11 +196,15 @@ class ActionEvaluator:
         enemies: list[Unit],
         current_best_hit_chance: float,
     ) -> list[Action]:
+        x, y = soldier.position
+
         possible_destinations = [
-            soldier.position - 2,
-            soldier.position - 1,
-            soldier.position + 1,
-            soldier.position + 2,
+            (x + 1, y),
+            (x - 1, y),
+            (x, y + 1),
+            (x, y - 1),
+            (x + 1, y + 1),
+            (x - 1, y - 1),
         ]
 
         actions: list[Action] = []
