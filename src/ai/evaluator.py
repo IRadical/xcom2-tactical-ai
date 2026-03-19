@@ -11,11 +11,42 @@ class ActionEvaluator:
     ) -> bool:
         dx = abs(attacker.position[0] - target.position[0])
         dy = abs(attacker.position[1] - target.position[1])
-
         return not (dx > 4 and dy > 2)
 
+    def get_directional_cover_value(
+        self,
+        attacker_position: tuple[int, int],
+        target_position: tuple[int, int],
+        base_cover: int,
+    ) -> int:
+        if base_cover <= 0:
+            return 0
+
+        dx = attacker_position[0] - target_position[0]
+        dy = attacker_position[1] - target_position[1]
+
+        manhattan_distance = abs(dx) + abs(dy)
+        if manhattan_distance <= 2:
+            return 0
+
+        if abs(dx) > abs(dy):
+            return base_cover
+
+        if abs(dx) == abs(dy):
+            return int(base_cover * 0.5)
+
+        return int(base_cover * 0.25)
+
     def is_flanked(self, attacker: Unit, target: Unit) -> bool:
-        return attacker.distance_to(target) <= 2 and target.cover > 0
+        if attacker.distance_to(target) > 2 or target.cover <= 0:
+            return False
+
+        effective_cover = self.get_directional_cover_value(
+            attacker_position=attacker.position,
+            target_position=target.position,
+            base_cover=target.cover,
+        )
+        return effective_cover < target.cover
 
     def estimate_hit_chance(self, attacker: Unit, target: Unit) -> float:
         if not self.has_line_of_sight(attacker, target):
@@ -24,9 +55,11 @@ class ActionEvaluator:
         distance = attacker.distance_to(target)
         distance_penalty = distance * 5
 
-        effective_cover = target.cover
-        if self.is_flanked(attacker, target):
-            effective_cover = 0
+        effective_cover = self.get_directional_cover_value(
+            attacker_position=attacker.position,
+            target_position=target.position,
+            base_cover=target.cover,
+        )
 
         raw_hit_chance = attacker.aim - distance_penalty - effective_cover
         return max(0, min(100, raw_hit_chance))
@@ -40,19 +73,19 @@ class ActionEvaluator:
     ) -> float:
         total_threat = 0.0
 
+        simulated_soldier = Unit(
+            name=soldier.name,
+            hp=soldier.hp,
+            aim=soldier.aim,
+            ammo=soldier.ammo,
+            position=position,
+            is_enemy=soldier.is_enemy,
+            cover=cover,
+        )
+
         for enemy in enemies:
             if not enemy.is_alive():
                 continue
-
-            simulated_soldier = Unit(
-                name=soldier.name,
-                hp=soldier.hp,
-                aim=soldier.aim,
-                ammo=soldier.ammo,
-                position=position,
-                is_enemy=soldier.is_enemy,
-                cover=cover,
-            )
 
             if not self.has_line_of_sight(enemy, simulated_soldier):
                 continue
@@ -60,9 +93,11 @@ class ActionEvaluator:
             distance = enemy.distance_to(simulated_soldier)
             distance_penalty = distance * 5
 
-            effective_cover = cover
-            if distance <= 2 and cover > 0:
-                effective_cover = 0
+            effective_cover = self.get_directional_cover_value(
+                attacker_position=enemy.position,
+                target_position=position,
+                base_cover=cover,
+            )
 
             estimated_enemy_hit = enemy.aim - distance_penalty - effective_cover
             estimated_enemy_hit = max(0, min(100, estimated_enemy_hit))
@@ -77,7 +112,7 @@ class ActionEvaluator:
         kill_bonus = 180 if enemy.hp <= 4 else 0
         wounded_target_bonus = max(0, 12 - enemy.hp) * 8
         close_range_bonus = 15 if soldier.distance_to(enemy) <= 4 else 0
-        flank_bonus = 50 if self.is_flanked(soldier, enemy) else 0
+        flank_bonus = 60 if self.is_flanked(soldier, enemy) else 0
 
         low_accuracy_penalty = 0
         if hit_chance < 25:
@@ -181,23 +216,29 @@ class ActionEvaluator:
         flank_setup_bonus = 0.0
         los_setup_bonus = 0.0
 
+        simulated_soldier = Unit(
+            name=soldier.name,
+            hp=soldier.hp,
+            aim=soldier.aim,
+            ammo=soldier.ammo,
+            position=destination,
+            is_enemy=soldier.is_enemy,
+            cover=cover_value,
+        )
+
         for enemy in enemies:
             future_distance = (
                 abs(destination[0] - enemy.position[0])
                 + abs(destination[1] - enemy.position[1])
             )
             if future_distance <= 2 and enemy.cover > 0:
-                flank_setup_bonus = max(flank_setup_bonus, 18)
-
-            simulated_soldier = Unit(
-                name=soldier.name,
-                hp=soldier.hp,
-                aim=soldier.aim,
-                ammo=soldier.ammo,
-                position=destination,
-                is_enemy=soldier.is_enemy,
-                cover=cover_value,
-            )
+                effective_cover = self.get_directional_cover_value(
+                    attacker_position=destination,
+                    target_position=enemy.position,
+                    base_cover=enemy.cover,
+                )
+                if effective_cover < enemy.cover:
+                    flank_setup_bonus = max(flank_setup_bonus, 24)
 
             if self.has_line_of_sight(simulated_soldier, enemy):
                 los_setup_bonus = max(los_setup_bonus, 12)
