@@ -24,6 +24,10 @@ class CombatEngine:
         }
 
     def resolve_shot(self, attacker, target) -> None:
+        if not self.evaluator.has_line_of_sight(attacker, target):
+            if self.verbose:
+                print(f"{attacker.name} has no line of sight to {target.name}")
+                 
         hit_chance = self.evaluator.estimate_hit_chance(attacker, target)
         hit_roll = random.randint(1, 100)
 
