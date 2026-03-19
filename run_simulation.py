@@ -21,5 +21,6 @@ def main():
     for action_name, count in results["action_counts"].items():
         print(f"{action_name}: {count}")
 
+
 if __name__ == "__main__":
     main()

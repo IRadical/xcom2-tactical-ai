@@ -6,7 +6,7 @@ class Unit:
     hp: int
     aim: int
     ammo: int
-    position: int
+    position: tuple[int, int]
     is_enemy: bool
     cover: int = 0
 
@@ -14,4 +14,6 @@ class Unit:
         return self.hp > 0
     
     def distance_to(self, other:"Unit") -> int:
-        return abs(self.position - other.position)
+        dx = abs(self.position[0] - other.position[0])
+        dy = abs(self.position[1] - other.position[1])
+        return dx + dy
