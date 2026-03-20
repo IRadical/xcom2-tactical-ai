@@ -6,15 +6,26 @@ import random
 
 class CombatAnalytics:
     def run_single_battle(self) -> dict:
-        soldier = Unit(
-            name="Ranger",
-            hp=10,
-            aim=75,
-            ammo=5,
-            position=(0, 0),
-            is_enemy=False,
-            cover=0,
-        )
+        soldiers = [
+            Unit(
+                name="Ranger-1",
+                hp=10,
+                aim=75,
+                ammo=5,
+                position=(0, 0),
+                is_enemy=False,
+                cover=0,
+            ),
+            Unit(
+                name="Ranger-2",
+                hp=10,
+                aim=72,
+                ammo=5,
+                position=(0, 1),
+                is_enemy=False,
+                cover=0,
+            ),
+        ]
 
         enemies = [
             Unit(
@@ -35,9 +46,18 @@ class CombatAnalytics:
                 True,
                 cover=random.choice([0, 20]),
             ),
+            Unit(
+                "StunLancer",
+                random.randint(5, 7),
+                62,
+                3,
+                (random.randint(5, 8), random.randint(0, 4)),
+                True,
+                cover=random.choice([0, 20]),
+            ),
         ]
 
-        game_state = GameState(soldier, enemies)
+        game_state = GameState(soldiers, enemies)
         engine = CombatEngine(game_state, verbose=False)
 
         turn = 0
@@ -47,13 +67,14 @@ class CombatAnalytics:
             engine.run_turn()
             turn += 1
 
-        enemies_alive = [enemy for enemy in enemies if enemy.is_alive()]
+        soldiers_alive = [s for s in soldiers if s.is_alive()]
+        enemies_alive = [e for e in enemies if e.is_alive()]
         metrics = engine.metrics
 
         return {
-            "win": len(enemies_alive) == 0 and soldier.hp > 0,
+            "win": len(enemies_alive) == 0 and len(soldiers_alive) > 0,
             "turns": turn,
-            "soldier_hp": soldier.hp,
+            "soldier_hp": sum(s.hp for s in soldiers_alive),
             "shots_fired": metrics["shots_fired"],
             "shots_hit": metrics["shots_hit"],
             "damage_dealt": metrics["damage_dealt"],
@@ -96,9 +117,7 @@ class CombatAnalytics:
             for action_name, count in result["action_counts"].items():
                 total_action_counts[action_name] += count
 
-        accuracy = 0.0
-        if total_shots_fired > 0:
-            accuracy = total_shots_hit / total_shots_fired
+        accuracy = total_shots_hit / total_shots_fired if total_shots_fired > 0 else 0
 
         return {
             "battles": battles,
