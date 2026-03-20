@@ -27,7 +27,8 @@ class CombatEngine:
         if not self.evaluator.has_line_of_sight(attacker, target):
             if self.verbose:
                 print(f"{attacker.name} has no line of sight to {target.name}")
-                 
+            return
+
         hit_chance = self.evaluator.estimate_hit_chance(attacker, target)
         hit_roll = random.randint(1, 100)
 
@@ -62,66 +63,77 @@ class CombatEngine:
                 )
 
     def player_turn(self) -> None:
-        soldier = self.game_state.soldier
-        action = self.evaluator.choose_best_action(self.game_state)
+        soldiers = self.game_state.living_soldiers()
 
-        if action.action_type in self.metrics["action_counts"]:
-            self.metrics["action_counts"][action.action_type] += 1
+        for soldier in soldiers:
+            local_state = GameState([soldier], self.game_state.enemies)
+            action = self.evaluator.choose_best_action(local_state)
 
-        if self.verbose:
-            print("\nAI decision:", action.action_type)
-
-        if action.action_type == "shoot":
-            targets = [
-                enemy for enemy in self.game_state.enemies
-                if enemy.is_alive() and enemy.name == action.target_name
-            ]
-
-            if targets and soldier.ammo > 0:
-                soldier.ammo -= 1
-                self.resolve_shot(soldier, targets[0])
-
-        elif action.action_type == "reload":
-            soldier.ammo = 5
-            if self.verbose:
-                print("Soldier reloads weapon")
-
-        elif action.action_type == "move":
-            soldier.position = action.destination
-            soldier.cover = self.evaluator.get_cover_value_for_position(action.destination)
+            if action.action_type in self.metrics["action_counts"]:
+                self.metrics["action_counts"][action.action_type] += 1
 
             if self.verbose:
-                print(f"Soldier moves to {action.destination} and gains cover {soldier.cover}")
+                print(f"\n{soldier.name} decision: {action.action_type}")
+
+            if action.action_type == "shoot":
+                targets = [
+                    enemy for enemy in self.game_state.enemies
+                    if enemy.is_alive() and enemy.name == action.target_name
+                ]
+
+                if targets and soldier.ammo > 0:
+                    soldier.ammo -= 1
+                    self.resolve_shot(soldier, targets[0])
+
+            elif action.action_type == "reload":
+                soldier.ammo = 5
+                if self.verbose:
+                    print(f"{soldier.name} reloads weapon")
+
+            elif action.action_type == "move":
+                soldier.position = action.destination
+                soldier.cover = self.evaluator.get_cover_value_for_position(action.destination)
+                if self.verbose:
+                    print(
+                        f"{soldier.name} moves to {action.destination} "
+                        f"and gains cover {soldier.cover}"
+                    )
 
     def enemy_turn(self) -> None:
-        soldier = self.game_state.soldier
+        soldiers = self.game_state.living_soldiers()
 
         for enemy in self.game_state.enemies:
             if not enemy.is_alive():
                 continue
 
-            if self.verbose:
-                print(f"{enemy.name} attacks")
-
-            self.resolve_shot(enemy, soldier)
-
-            if soldier.hp <= 0:
-                if self.verbose:
-                    print("Soldier has been eliminated")
+            soldiers = self.game_state.living_soldiers()
+            if not soldiers:
                 return
+
+            visible_targets = [
+                soldier for soldier in soldiers
+                if self.evaluator.has_line_of_sight(enemy, soldier)
+            ]
+
+            if not visible_targets:
+                continue
+
+            target = random.choice(visible_targets)
+
+            if self.verbose:
+                print(f"{enemy.name} attacks {target.name}")
+
+            self.resolve_shot(enemy, target)
+
+            if target.hp <= 0 and self.verbose:
+                print(f"{target.name} has been eliminated")
 
     def run_turn(self) -> None:
         self.player_turn()
-
-        if self.game_state.soldier.hp <= 0:
-            return
-
         self.enemy_turn()
 
     def battle_over(self) -> bool:
-        soldier_alive = self.game_state.soldier.hp > 0
-        enemies_alive = [
-            enemy for enemy in self.game_state.enemies
-            if enemy.is_alive()
-        ]
-        return not soldier_alive or len(enemies_alive) == 0
+        return (
+            len(self.game_state.living_soldiers()) == 0
+            or len(self.game_state.living_enemies()) == 0
+        )

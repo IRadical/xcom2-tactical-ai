@@ -1,10 +1,20 @@
-from dataclasses import dataclass
 from src.game.entities import Unit
 
-@dataclass
-class GameState:
-    soldier: Unit
-    enemies: list[Unit]
 
-    def living_enemies(self) -> list [Unit]:
+class GameState:
+    def __init__(self, soldiers: list[Unit], enemies: list[Unit]):
+        self.soldiers = soldiers
+        self.enemies = enemies
+
+    @property
+    def soldier(self) -> Unit:
+        living = self.living_soldiers()
+        if living:
+            return living[0]
+        return self.soldiers[0]
+
+    def living_enemies(self) -> list[Unit]:
         return [enemy for enemy in self.enemies if enemy.is_alive()]
+
+    def living_soldiers(self) -> list[Unit]:
+        return [soldier for soldier in self.soldiers if soldier.is_alive()]
