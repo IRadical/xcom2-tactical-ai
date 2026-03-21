@@ -2,12 +2,17 @@ from src.game.entities import Unit
 
 
 class GameState:
-    def __init__(self, soldiers: list[Unit], enemies: list[Unit]):
+    def __init__(self, soldiers: list[Unit], enemies: list[Unit],
+                 active_soldier: Unit | None = None):
         self.soldiers = soldiers
         self.enemies = enemies
+        self.active_soldier = active_soldier
 
     @property
     def soldier(self) -> Unit:
+        if self.active_soldier is not None:
+            return self.active_soldier
+        
         living = self.living_soldiers()
         if living:
             return living[0]

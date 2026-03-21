@@ -24,6 +24,7 @@ class CombatEngine:
                 "wait": 0,
                 "overwatch": 0,
                 "heal": 0,
+                "hunker": 0,
             },
         }
 
@@ -66,6 +67,19 @@ class CombatEngine:
                     f"(target cover={target.cover}, hit chance={round(hit_chance, 2)})"
                 )
 
+    def _decrement_cooldowns(self, soldier) -> None:
+        updated = {}
+        for ability_name, turns in soldier.ability_cooldowns.items():
+            remaining = max(0, turns - 1)
+            if remaining > 0:
+                updated[ability_name] = remaining
+        soldier.ability_cooldowns = updated
+
+    def _reset_hunker_if_needed(self, soldier) -> None:
+        if soldier.hunkered_down:
+            soldier.cover = max(0, soldier.cover - 20)
+            soldier.hunkered_down = False
+
     def _choose_focus_target(self, soldiers, enemies):
         visible_enemies = [
             enemy for enemy in enemies
@@ -99,7 +113,11 @@ class CombatEngine:
         return best_enemy.name
 
     def _choose_action_for_soldier(self, soldier):
-        local_state = GameState([soldier], self.game_state.enemies)
+        local_state = GameState(
+            soldiers=self.game_state.living_soldiers(),
+            enemies=self.game_state.enemies,
+            active_soldier=soldier,
+        )
         action = self.evaluator.choose_best_action(local_state)
 
         if action.action_type != "shoot" or not self.focus_target_name:
@@ -160,13 +178,16 @@ class CombatEngine:
             if not enemy.is_alive():
                 break
 
-    def _resolve_heal(self, healer, target_name: str | None):
+    def _resolve_heal(self, healer, target_name: str | None) -> None:
         if target_name is None:
             return
-        
+
         if healer.medkit_charges <= 0:
             return
-        
+
+        if healer.ability_cooldowns.get("heal", 0) > 0:
+            return
+
         valid_targets = [
             ally for ally in self.game_state.living_soldiers()
             if ally.name == target_name and healer.distance_to(ally) <= 2
@@ -174,7 +195,7 @@ class CombatEngine:
 
         if not valid_targets:
             return
-        
+
         target = valid_targets[0]
         heal_amount = 4
 
@@ -182,6 +203,7 @@ class CombatEngine:
         target.hp = min(target.max_hp, target.hp + heal_amount)
         actual_heal = target.hp - previous_hp
         healer.medkit_charges -= 1
+        healer.ability_cooldowns["heal"] = 2
 
         if self.verbose:
             print(f"{healer.name} heals {target.name} for {actual_heal} HP")
@@ -190,6 +212,10 @@ class CombatEngine:
         soldiers = self.game_state.living_soldiers()
         enemies = self.game_state.living_enemies()
         self.overwatch_queue = set()
+
+        for soldier in soldiers:
+            self._decrement_cooldowns(soldier)
+            self._reset_hunker_if_needed(soldier)
 
         self.focus_target_name = self._choose_focus_target(soldiers, enemies)
 
@@ -234,6 +260,16 @@ class CombatEngine:
                     self.overwatch_queue.add(soldier.name)
                     if self.verbose:
                         print(f"{soldier.name} enters overwatch")
+
+            elif action.action_type == "heal":
+                self._resolve_heal(soldier, action.target_name)
+
+            elif action.action_type == "hunker":
+                if not soldier.hunkered_down:
+                    soldier.cover = min(60, soldier.cover + 20)
+                    soldier.hunkered_down = True
+                    if self.verbose:
+                        print(f"{soldier.name} hunkers down and increases cover to {soldier.cover}")
 
     def enemy_turn(self) -> None:
         for enemy in self.game_state.enemies:
