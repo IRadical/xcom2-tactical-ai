@@ -360,6 +360,7 @@ class ActionEvaluator:
         self,
         soldier: Unit,
         enemies_hit: list[Unit],
+        visible_enemies: list[Unit],
     ) -> float:
         role = self.get_role_profile(soldier)
 
@@ -371,18 +372,33 @@ class ActionEvaluator:
 
         enemies_hit_count = len(enemies_hit)
         kills_possible = sum(1 for enemy in enemies_hit if enemy.hp <= 3)
-        wounded_bonus = sum(max(0, 8 - enemy.hp) * 6 for enemy in enemies_hit)
-        cover_bonus = sum(35 if enemy.cover > 0 else 0 for enemy in enemies_hit)
-        cluster_bonus = 25 if enemies_hit_count >= 2 else 0
-        scarcity_penalty = 15 if soldier.grenade_charges == 1 else 0
+        enemies_in_cover = sum(1 for enemy in enemies_hit if enemy.cover > 0)
+
+        wounded_bonus = sum(max(0, 6 - enemy.hp) * 5 for enemy in enemies_hit)
+        cluster_bonus = 35 if enemies_hit_count >= 2 else 0
+        cover_bonus = enemies_in_cover * 18
+        role_bonus = role["grenade_bonus"]
+
+        best_visible_hit = 0.0
+        if visible_enemies:
+            best_visible_hit = max(
+                self.estimate_hit_chance(soldier, enemy)
+                for enemy in visible_enemies
+            )
+
+        shot_already_good_penalty = 45 if best_visible_hit >= 65 else 20 if best_visible_hit >= 50 else 0
+        single_target_penalty = 35 if enemies_hit_count == 1 and kills_possible == 0 and enemies_in_cover == 0 else 0
+        scarcity_penalty = 25 if soldier.grenade_charges == 1 else 0
 
         return (
-            (enemies_hit_count * 40)
-            + (kills_possible * 120)
+            (kills_possible * 140)
+            + (enemies_hit_count * 28)
             + wounded_bonus
-            + cover_bonus
             + cluster_bonus
-            + role["grenade_bonus"]
+            + cover_bonus
+            + role_bonus
+            - shot_already_good_penalty
+            - single_target_penalty
             - scarcity_penalty
         )
 
@@ -562,7 +578,7 @@ class ActionEvaluator:
 
         grenade_actions: list[Action] = []
         for target_position, enemies_hit in self.get_grenade_candidates(soldier, enemies):
-            grenade_score = self.score_grenade(soldier, enemies_hit)
+            grenade_score = self.score_grenade(soldier, enemies_hit, visible_enemies)
             grenade_actions.append(
                 Action(
                     action_type="grenade",
@@ -580,7 +596,7 @@ class ActionEvaluator:
 
         if grenade_actions:
             best_grenade = max(grenade_actions, key=lambda action: action.score)
-            if best_grenade.score >= 150:
+            if best_grenade.score >= 185:
                 return best_grenade
 
         if soldier.ammo > 0 and shot_actions and best_hit_chance >= 55:
