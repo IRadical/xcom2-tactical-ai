@@ -4,6 +4,32 @@ from src.game.entities import Unit
 
 
 class ActionEvaluator:
+    def get_role_profile(self, soldier: Unit) -> dict:
+        profiles = {
+            "assault": {
+                "preferred_distance": 2,
+                "close_range_bonus": 30,
+                "long_range_bonus": 0,
+                "survival_multiplier": 1.0,
+                "flank_bonus": 70,
+            },
+            "sniper": {
+                "preferred_distance": 5,
+                "close_range_bonus": 0,
+                "long_range_bonus": 30,
+                "survival_multiplier": 1.2,
+                "flank_bonus": 35,
+            },
+            "support": {
+                "preferred_distance": 3,
+                "close_range_bonus": 10,
+                "long_range_bonus": 10,
+                "survival_multiplier": 1.3,
+                "flank_bonus": 40,
+            },
+        }
+        return profiles.get(soldier.role, profiles["assault"])
+
     def has_line_of_sight(
         self,
         attacker: Unit,
@@ -24,8 +50,8 @@ class ActionEvaluator:
 
         dx = attacker_position[0] - target_position[0]
         dy = attacker_position[1] - target_position[1]
-
         manhattan_distance = abs(dx) + abs(dy)
+
         if manhattan_distance <= 2:
             return 0
 
@@ -81,6 +107,7 @@ class ActionEvaluator:
             position=position,
             is_enemy=soldier.is_enemy,
             cover=cover,
+            role=soldier.role,
         )
 
         for enemy in enemies:
@@ -107,12 +134,16 @@ class ActionEvaluator:
         return total_threat
 
     def score_shot(self, soldier: Unit, enemy: Unit, enemies: list[Unit]) -> float:
+        role = self.get_role_profile(soldier)
         hit_chance = self.estimate_hit_chance(soldier, enemy)
+        distance = soldier.distance_to(enemy)
 
         kill_bonus = 180 if enemy.hp <= 4 else 0
         wounded_target_bonus = max(0, 12 - enemy.hp) * 8
-        close_range_bonus = 15 if soldier.distance_to(enemy) <= 4 else 0
-        flank_bonus = 60 if self.is_flanked(soldier, enemy) else 0
+        flank_bonus = role["flank_bonus"] if self.is_flanked(soldier, enemy) else 0
+
+        close_range_bonus = role["close_range_bonus"] if distance <= 3 else 0
+        long_range_bonus = role["long_range_bonus"] if distance >= 4 else 0
 
         low_accuracy_penalty = 0
         if hit_chance < 25:
@@ -128,10 +159,11 @@ class ActionEvaluator:
         )
 
         threat_penalty = 0.0
+        survival_multiplier = role["survival_multiplier"]
         if soldier.hp <= 4:
-            threat_penalty = current_position_threat * 25
+            threat_penalty = current_position_threat * 25 * survival_multiplier
         elif soldier.hp <= 7:
-            threat_penalty = current_position_threat * 12
+            threat_penalty = current_position_threat * 12 * survival_multiplier
 
         los_bonus = 10 if self.has_line_of_sight(soldier, enemy) else -100
 
@@ -140,6 +172,7 @@ class ActionEvaluator:
             + kill_bonus
             + wounded_target_bonus
             + close_range_bonus
+            + long_range_bonus
             + flank_bonus
             + los_bonus
             - low_accuracy_penalty
@@ -183,15 +216,17 @@ class ActionEvaluator:
         if not enemies:
             return 0
 
+        role = self.get_role_profile(soldier)
+
         distances = [
             abs(destination[0] - enemy.position[0]) + abs(destination[1] - enemy.position[1])
             for enemy in enemies
         ]
         closest_distance = min(distances)
 
-        preferred_distance = 3
+        preferred_distance = role["preferred_distance"]
         distance_to_preferred = abs(closest_distance - preferred_distance)
-        positioning_score = 28 - (distance_to_preferred * 5)
+        positioning_score = 30 - (distance_to_preferred * 5)
 
         cover_value = self.get_cover_value_for_position(destination)
         cover_bonus = cover_value * 0.9
@@ -203,15 +238,15 @@ class ActionEvaluator:
 
         survival_bonus = 0.0
         if soldier.hp <= 4:
-            survival_bonus = cover_value * 1.5
+            survival_bonus = cover_value * 1.6 * role["survival_multiplier"]
         elif soldier.hp <= 7:
-            survival_bonus = cover_value * 0.8
+            survival_bonus = cover_value * 0.9 * role["survival_multiplier"]
 
         shot_quality_bonus = 0.0
         if current_best_hit_chance < 20:
-            shot_quality_bonus = 30
+            shot_quality_bonus = 25
         elif current_best_hit_chance < 30:
-            shot_quality_bonus = 15
+            shot_quality_bonus = 12
 
         flank_setup_bonus = 0.0
         los_setup_bonus = 0.0
@@ -224,6 +259,7 @@ class ActionEvaluator:
             position=destination,
             is_enemy=soldier.is_enemy,
             cover=cover_value,
+            role=soldier.role,
         )
 
         for enemy in enemies:
@@ -231,6 +267,7 @@ class ActionEvaluator:
                 abs(destination[0] - enemy.position[0])
                 + abs(destination[1] - enemy.position[1])
             )
+
             if future_distance <= 2 and enemy.cover > 0:
                 effective_cover = self.get_directional_cover_value(
                     attacker_position=destination,
@@ -258,7 +295,7 @@ class ActionEvaluator:
         )
 
         threat_reduction_bonus = max(0.0, current_threat - destination_threat) * 40
-        threat_penalty = destination_threat * 20
+        threat_penalty = destination_threat * 20 * role["survival_multiplier"]
 
         if soldier.hp <= 4:
             threat_reduction_bonus *= 1.4

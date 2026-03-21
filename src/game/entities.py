@@ -9,6 +9,7 @@ class Unit:
     position: tuple[int, int]
     is_enemy: bool
     cover: int = 0
+    role: str = "assault"
 
     def is_alive(self) -> bool:
         return self.hp > 0
