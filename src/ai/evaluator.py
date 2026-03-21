@@ -12,6 +12,7 @@ class ActionEvaluator:
                 "long_range_bonus": 0,
                 "survival_multiplier": 1.0,
                 "flank_bonus": 70,
+                "overwatch_bonus": 5,
             },
             "sniper": {
                 "preferred_distance": 5,
@@ -19,6 +20,7 @@ class ActionEvaluator:
                 "long_range_bonus": 30,
                 "survival_multiplier": 1.2,
                 "flank_bonus": 35,
+                "overwatch_bonus": 30,
             },
             "support": {
                 "preferred_distance": 3,
@@ -26,6 +28,7 @@ class ActionEvaluator:
                 "long_range_bonus": 10,
                 "survival_multiplier": 1.3,
                 "flank_bonus": 40,
+                "overwatch_bonus": 18,
             },
         }
         return profiles.get(soldier.role, profiles["assault"])
@@ -196,6 +199,38 @@ class ActionEvaluator:
             return -35
 
         return -50
+
+    def score_overwatch(self, soldier: Unit, visible_enemies: list[Unit], enemies: list[Unit]) -> float:
+        role = self.get_role_profile(soldier)
+
+        if soldier.ammo <= 0:
+            return -100
+
+        if not visible_enemies:
+            return -20
+
+        best_visible_hit = max(
+            self.estimate_hit_chance(soldier, enemy)
+            for enemy in visible_enemies
+        )
+
+        current_position_threat = self.estimate_position_threat(
+            soldier=soldier,
+            enemies=enemies,
+            position=soldier.position,
+            cover=soldier.cover,
+        )
+
+        threat_bonus = current_position_threat * 12
+        low_hp_bonus = 20 if soldier.hp <= 5 else 0
+
+        return (
+            25
+            + (best_visible_hit * 0.8)
+            + role["overwatch_bonus"]
+            + threat_bonus
+            + low_hp_bonus
+        )
 
     def get_cover_value_for_position(self, destination: tuple[int, int]) -> int:
         x, y = destination
@@ -394,6 +429,13 @@ class ActionEvaluator:
             Action(
                 action_type="reload",
                 score=self.score_reload(soldier, best_hit_chance, enemies),
+            )
+        )
+
+        possible_actions.append(
+            Action(
+                action_type="overwatch",
+                score=self.score_overwatch(soldier, visible_enemies, enemies),
             )
         )
 

@@ -9,6 +9,7 @@ class CombatEngine:
         self.evaluator = ActionEvaluator()
         self.verbose = verbose
         self.focus_target_name: str | None = None
+        self.overwatch_queue: set[str] = set()
 
         self.metrics = {
             "shots_fired": 0,
@@ -21,6 +22,7 @@ class CombatEngine:
                 "reload": 0,
                 "move": 0,
                 "wait": 0,
+                "overwatch": 0,
             },
         }
 
@@ -63,18 +65,18 @@ class CombatEngine:
                     f"(target cover={target.cover}, hit chance={round(hit_chance, 2)})"
                 )
 
-    def _chose_focus_target(self, soldiers, enemies):
+    def _choose_focus_target(self, soldiers, enemies):
         visible_enemies = [
-            enemy for enemy in enemies 
+            enemy for enemy in enemies
             if any(
                 self.evaluator.has_line_of_sight(soldier, enemy)
                 for soldier in soldiers
             )
         ]
 
-        if not visible_enemies: 
+        if not visible_enemies:
             return None
-        
+
         def target_priority(enemy):
             avg_hit = 0.0
             visible_count = 0
@@ -83,36 +85,36 @@ class CombatEngine:
                 if self.evaluator.has_line_of_sight(soldier, enemy):
                     avg_hit += self.evaluator.estimate_hit_chance(soldier, enemy)
                     visible_count += 1
-                
+
             if visible_count > 0:
                 avg_hit /= visible_count
-            
+
             low_hp_bonus = max(0, 10 - enemy.hp) * 10
             visibility_bonus = visible_count * 20
 
             return avg_hit + low_hp_bonus + visibility_bonus
-        
+
         best_enemy = max(visible_enemies, key=target_priority)
-        return best_enemy.name    
-    
+        return best_enemy.name
+
     def _choose_action_for_soldier(self, soldier):
         local_state = GameState([soldier], self.game_state.enemies)
         action = self.evaluator.choose_best_action(local_state)
 
         if action.action_type != "shoot" or not self.focus_target_name:
             return action
-        
-        foscus_targets = [
+
+        focus_targets = [
             enemy for enemy in self.game_state.enemies
             if enemy.is_alive()
             and enemy.name == self.focus_target_name
             and self.evaluator.has_line_of_sight(soldier, enemy)
         ]
 
-        if not foscus_targets:
+        if not focus_targets:
             return action
-        
-        focus_enemy = foscus_targets[0]
+
+        focus_enemy = focus_targets[0]
         focus_score = self.evaluator.score_shot(
             soldier,
             focus_enemy,
@@ -122,14 +124,47 @@ class CombatEngine:
         if focus_score >= action.score - 15:
             action.target_name = focus_enemy.name
             action.score = focus_score
-        
+
         return action
+
+    def _resolve_overwatch_for_enemy(self, enemy) -> None:
+        if not enemy.is_alive():
+            return
+
+        active_names = list(self.overwatch_queue)
+
+        for soldier_name in active_names:
+            soldiers = [
+                s for s in self.game_state.living_soldiers()
+                if s.name == soldier_name and s.ammo > 0
+            ]
+
+            if not soldiers:
+                self.overwatch_queue.discard(soldier_name)
+                continue
+
+            soldier = soldiers[0]
+
+            if not self.evaluator.has_line_of_sight(soldier, enemy):
+                continue
+
+            soldier.ammo -= 1
+
+            if self.verbose:
+                print(f"{soldier.name} triggers overwatch on {enemy.name}")
+
+            self.resolve_shot(soldier, enemy)
+            self.overwatch_queue.discard(soldier_name)
+
+            if not enemy.is_alive():
+                break
 
     def player_turn(self) -> None:
         soldiers = self.game_state.living_soldiers()
         enemies = self.game_state.living_enemies()
+        self.overwatch_queue = set()
 
-        self.focus_target_name = self._chose_focus_target(soldiers,enemies)
+        self.focus_target_name = self._choose_focus_target(soldiers, enemies)
 
         if self.verbose and self.focus_target_name:
             print(f"\nSquad focus target: {self.focus_target_name}")
@@ -167,10 +202,19 @@ class CombatEngine:
                         f"and gains cover {soldier.cover}"
                     )
 
-    def enemy_turn(self) -> None:
-        soldiers = self.game_state.living_soldiers()
+            elif action.action_type == "overwatch":
+                if soldier.ammo > 0:
+                    self.overwatch_queue.add(soldier.name)
+                    if self.verbose:
+                        print(f"{soldier.name} enters overwatch")
 
+    def enemy_turn(self) -> None:
         for enemy in self.game_state.enemies:
+            if not enemy.is_alive():
+                continue
+
+            self._resolve_overwatch_for_enemy(enemy)
+
             if not enemy.is_alive():
                 continue
 
@@ -186,7 +230,7 @@ class CombatEngine:
             if not visible_targets:
                 continue
 
-            target = random.choice(visible_targets)
+            target = min(visible_targets, key=lambda soldier: soldier.hp)
 
             if self.verbose:
                 print(f"{enemy.name} attacks {target.name}")

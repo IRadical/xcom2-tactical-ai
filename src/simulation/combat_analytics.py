@@ -11,7 +11,7 @@ class CombatAnalytics:
                 name="Assault-1",
                 hp=10,
                 aim=75,
-                ammo=5,
+                ammo=9,
                 position=(0, 0),
                 is_enemy=False,
                 cover=0,
@@ -103,6 +103,7 @@ class CombatAnalytics:
             "reload": 0,
             "move": 0,
             "wait": 0,
+            "overwatch": 0,
         }
 
         for _ in range(battles):
