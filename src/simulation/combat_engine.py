@@ -8,6 +8,7 @@ class CombatEngine:
         self.game_state = game_state
         self.evaluator = ActionEvaluator()
         self.verbose = verbose
+        self.focus_target_name: str | None = None
 
         self.metrics = {
             "shots_fired": 0,
@@ -62,12 +63,79 @@ class CombatEngine:
                     f"(target cover={target.cover}, hit chance={round(hit_chance, 2)})"
                 )
 
+    def _chose_focus_target(self, soldiers, enemies):
+        visible_enemies = [
+            enemy for enemy in enemies 
+            if any(
+                self.evaluator.has_line_of_sight(soldier, enemy)
+                for soldier in soldiers
+            )
+        ]
+
+        if not visible_enemies: 
+            return None
+        
+        def target_priority(enemy):
+            avg_hit = 0.0
+            visible_count = 0
+
+            for soldier in soldiers:
+                if self.evaluator.has_line_of_sight(soldier, enemy):
+                    avg_hit += self.evaluator.estimate_hit_chance(soldier, enemy)
+                    visible_count += 1
+                
+            if visible_count > 0:
+                avg_hit /= visible_count
+            
+            low_hp_bonus = max(0, 10 - enemy.hp) * 10
+            visibility_bonus = visible_count * 20
+
+            return avg_hit + low_hp_bonus + visibility_bonus
+        
+        best_enemy = max(visible_enemies, key=target_priority)
+        return best_enemy.name    
+    
+    def _choose_action_for_soldier(self, soldier):
+        local_state = GameState([soldier], self.game_state.enemies)
+        action = self.evaluator.choose_best_action(local_state)
+
+        if action.action_type != "shoot" or not self.focus_target_name:
+            return action
+        
+        foscus_targets = [
+            enemy for enemy in self.game_state.enemies
+            if enemy.is_alive()
+            and enemy.name == self.focus_target_name
+            and self.evaluator.has_line_of_sight(soldier, enemy)
+        ]
+
+        if not foscus_targets:
+            return action
+        
+        focus_enemy = foscus_targets[0]
+        focus_score = self.evaluator.score_shot(
+            soldier,
+            focus_enemy,
+            self.game_state.living_enemies(),
+        )
+
+        if focus_score >= action.score - 15:
+            action.target_name = focus_enemy.name
+            action.score = focus_score
+        
+        return action
+
     def player_turn(self) -> None:
         soldiers = self.game_state.living_soldiers()
+        enemies = self.game_state.living_enemies()
+
+        self.focus_target_name = self._chose_focus_target(soldiers,enemies)
+
+        if self.verbose and self.focus_target_name:
+            print(f"\nSquad focus target: {self.focus_target_name}")
 
         for soldier in soldiers:
-            local_state = GameState([soldier], self.game_state.enemies)
-            action = self.evaluator.choose_best_action(local_state)
+            action = self._choose_action_for_soldier(soldier)
 
             if action.action_type in self.metrics["action_counts"]:
                 self.metrics["action_counts"][action.action_type] += 1
