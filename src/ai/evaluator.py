@@ -356,50 +356,9 @@ class ActionEvaluator:
 
         return candidates
 
-    def estimate_follow_up_grenade_value(
-        self,
-        soldier: Unit,
-        allies: list[Unit],
-        enemies_hit: list[Unit],
-    ) -> float:
-        if not enemies_hit:
-            return 0.0
-
-        follow_up_value = 0.0
-
-        for enemy in enemies_hit:
-            original_cover = enemy.cover
-            reduced_cover = max(0, enemy.cover - 20)
-
-            for ally in allies:
-                if ally.name == soldier.name:
-                    continue
-                if not ally.is_alive():
-                    continue
-                if ally.ammo <= 0:
-                    continue
-                if not self.has_line_of_sight(ally, enemy):
-                    continue
-
-                before_hit = self.estimate_hit_chance(ally, enemy)
-
-                distance = ally.distance_to(enemy)
-                distance_penalty = distance * 5
-                raw_after_hit = ally.aim - distance_penalty - reduced_cover
-                after_hit = max(0, min(100, raw_after_hit))
-
-                hit_gain = max(0.0, after_hit - before_hit)
-                follow_up_value += hit_gain * 0.9
-
-                if original_cover > 0 and reduced_cover == 0:
-                    follow_up_value += 8
-
-        return follow_up_value
-
     def score_grenade(
         self,
         soldier: Unit,
-        allies: list[Unit],
         enemies_hit: list[Unit],
         visible_enemies: list[Unit],
     ) -> float:
@@ -416,15 +375,8 @@ class ActionEvaluator:
         enemies_in_cover = sum(1 for enemy in enemies_hit if enemy.cover > 0)
 
         wounded_bonus = sum(max(0, 6 - enemy.hp) * 5 for enemy in enemies_hit)
-        cluster_bonus = 35 if enemies_hit_count >= 2 else 0
-        cover_bonus = enemies_in_cover * 14
-        role_bonus = role["grenade_bonus"]
-
-        follow_up_bonus = self.estimate_follow_up_grenade_value(
-            soldier=soldier,
-            allies=allies,
-            enemies_hit=enemies_hit,
-        )
+        cluster_bonus = 30 if enemies_hit_count >= 2 else 0
+        cover_bonus = enemies_in_cover * 12
 
         best_visible_hit = 0.0
         if visible_enemies:
@@ -433,18 +385,17 @@ class ActionEvaluator:
                 for enemy in visible_enemies
             )
 
-        shot_already_good_penalty = 50 if best_visible_hit >= 65 else 22 if best_visible_hit >= 50 else 0
+        shot_already_good_penalty = 45 if best_visible_hit >= 65 else 20 if best_visible_hit >= 50 else 0
         single_target_penalty = 35 if enemies_hit_count == 1 and kills_possible == 0 and enemies_in_cover == 0 else 0
         scarcity_penalty = 25 if soldier.grenade_charges == 1 else 0
 
         return (
             (kills_possible * 140)
-            + (enemies_hit_count * 26)
+            + (enemies_hit_count * 28)
             + wounded_bonus
             + cluster_bonus
             + cover_bonus
-            + follow_up_bonus
-            + role_bonus
+            + role["grenade_bonus"]
             - shot_already_good_penalty
             - single_target_penalty
             - scarcity_penalty
@@ -626,12 +577,7 @@ class ActionEvaluator:
 
         grenade_actions: list[Action] = []
         for target_position, enemies_hit in self.get_grenade_candidates(soldier, enemies):
-            grenade_score = self.score_grenade(
-                soldier=soldier,
-                allies=allies,
-                enemies_hit=enemies_hit,
-                visible_enemies=visible_enemies,
-            )
+            grenade_score = self.score_grenade(soldier, enemies_hit, visible_enemies)
             grenade_actions.append(
                 Action(
                     action_type="grenade",
@@ -649,7 +595,7 @@ class ActionEvaluator:
 
         if grenade_actions:
             best_grenade = max(grenade_actions, key=lambda action: action.score)
-            if best_grenade.score >= 175:
+            if best_grenade.score >= 185:
                 return best_grenade
 
         if soldier.ammo > 0 and shot_actions and best_hit_chance >= 55:
