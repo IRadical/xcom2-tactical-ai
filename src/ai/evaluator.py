@@ -15,6 +15,7 @@ class ActionEvaluator:
                 "overwatch_bonus": 5,
                 "heal_bonus": 0,
                 "hunker_bonus": 8,
+                "grenade_bonus": 25,
             },
             "sniper": {
                 "preferred_distance": 5,
@@ -25,6 +26,7 @@ class ActionEvaluator:
                 "overwatch_bonus": 30,
                 "heal_bonus": 0,
                 "hunker_bonus": 20,
+                "grenade_bonus": 5,
             },
             "support": {
                 "preferred_distance": 3,
@@ -35,6 +37,7 @@ class ActionEvaluator:
                 "overwatch_bonus": 18,
                 "heal_bonus": 60,
                 "hunker_bonus": 25,
+                "grenade_bonus": 15,
             },
         }
         return profiles.get(soldier.role, profiles["assault"])
@@ -119,6 +122,7 @@ class ActionEvaluator:
             role=soldier.role,
             max_hp=soldier.max_hp,
             medkit_charges=soldier.medkit_charges,
+            grenade_charges=soldier.grenade_charges,
             ability_cooldowns=dict(soldier.ability_cooldowns),
             hunkered_down=soldier.hunkered_down,
         )
@@ -250,7 +254,7 @@ class ActionEvaluator:
 
         if soldier.medkit_charges <= 0:
             return -100, None
-        
+
         if soldier.ability_cooldowns.get("heal", 0) > 0:
             return -100, None
 
@@ -279,24 +283,24 @@ class ActionEvaluator:
         score = heal_priority(best_ally) + role["heal_bonus"]
 
         return score, best_ally.name
-    
+
     def score_hunker(self, soldier: Unit, enemies: list[Unit], best_hit_chance: float) -> float:
         role = self.get_role_profile(soldier)
 
         if soldier.hunkered_down:
             return -100
-        
+
         current_position_threat = self.estimate_position_threat(
             soldier=soldier,
             enemies=enemies,
             position=soldier.position,
-            cover=soldier.cover,   
+            cover=soldier.cover,
         )
 
         low_hp_bonus = 35 if soldier.hp <= 4 else 15 if soldier.hp <= 7 else 0
         poor_shot_bonus = 20 if best_hit_chance < 25 else 0
 
-        return(
+        return (
             10
             + role["hunker_bonus"]
             + (current_position_threat * 30)
@@ -312,6 +316,75 @@ class ActionEvaluator:
         if (x + y) % 2 == 0:
             return 20
         return 0
+
+    def get_grenade_candidates(
+        self,
+        soldier: Unit,
+        enemies: list[Unit],
+    ) -> list[tuple[tuple[int, int], list[Unit]]]:
+        if soldier.grenade_charges <= 0:
+            return []
+
+        candidates: list[tuple[tuple[int, int], list[Unit]]] = []
+        seen_positions: set[tuple[int, int]] = set()
+        grenade_range = 4
+        blast_radius = 1
+
+        for enemy in enemies:
+            if not enemy.is_alive():
+                continue
+
+            if soldier.distance_to(enemy) > grenade_range:
+                continue
+
+            center = enemy.position
+            if center in seen_positions:
+                continue
+
+            affected = [
+                other_enemy
+                for other_enemy in enemies
+                if other_enemy.is_alive()
+                and (
+                    abs(other_enemy.position[0] - center[0])
+                    + abs(other_enemy.position[1] - center[1])
+                ) <= blast_radius
+            ]
+
+            candidates.append((center, affected))
+            seen_positions.add(center)
+
+        return candidates
+
+    def score_grenade(
+        self,
+        soldier: Unit,
+        enemies_hit: list[Unit],
+    ) -> float:
+        role = self.get_role_profile(soldier)
+
+        if soldier.grenade_charges <= 0:
+            return -100
+
+        if not enemies_hit:
+            return -100
+
+        enemies_hit_count = len(enemies_hit)
+        kills_possible = sum(1 for enemy in enemies_hit if enemy.hp <= 3)
+        wounded_bonus = sum(max(0, 8 - enemy.hp) * 6 for enemy in enemies_hit)
+        cover_bonus = sum(35 if enemy.cover > 0 else 0 for enemy in enemies_hit)
+        cluster_bonus = 25 if enemies_hit_count >= 2 else 0
+        scarcity_penalty = 15 if soldier.grenade_charges == 1 else 0
+
+        return (
+            (enemies_hit_count * 40)
+            + (kills_possible * 120)
+            + wounded_bonus
+            + cover_bonus
+            + cluster_bonus
+            + role["grenade_bonus"]
+            - scarcity_penalty
+        )
 
     def score_move(
         self,
@@ -369,7 +442,8 @@ class ActionEvaluator:
             role=soldier.role,
             max_hp=soldier.max_hp,
             medkit_charges=soldier.medkit_charges,
-            ability_cooldowns= dict(soldier.ability_cooldowns),
+            grenade_charges=soldier.grenade_charges,
+            ability_cooldowns=dict(soldier.ability_cooldowns),
             hunkered_down=soldier.hunkered_down,
         )
 
@@ -486,12 +560,28 @@ class ActionEvaluator:
                     )
                 )
 
+        grenade_actions: list[Action] = []
+        for target_position, enemies_hit in self.get_grenade_candidates(soldier, enemies):
+            grenade_score = self.score_grenade(soldier, enemies_hit)
+            grenade_actions.append(
+                Action(
+                    action_type="grenade",
+                    target_position=target_position,
+                    score=grenade_score,
+                )
+            )
+
         best_hit_chance = 0.0
         if visible_enemies:
             best_hit_chance = max(
                 self.estimate_hit_chance(soldier, enemy)
                 for enemy in visible_enemies
             )
+
+        if grenade_actions:
+            best_grenade = max(grenade_actions, key=lambda action: action.score)
+            if best_grenade.score >= 150:
+                return best_grenade
 
         if soldier.ammo > 0 and shot_actions and best_hit_chance >= 55:
             return max(shot_actions, key=lambda action: action.score)
@@ -503,6 +593,7 @@ class ActionEvaluator:
 
         possible_actions: list[Action] = []
         possible_actions.extend(shot_actions)
+        possible_actions.extend(grenade_actions)
 
         possible_actions.append(
             Action(
