@@ -78,6 +78,7 @@ class CombatEngine:
 
         blast_radius = 1
         grenade_damage = 3
+
         affected_enemies = [
             enemy
             for enemy in self.game_state.living_enemies()
@@ -101,10 +102,11 @@ class CombatEngine:
             enemy.hp = max(0, enemy.hp - grenade_damage)
             actual_damage = previous_hp - enemy.hp
 
-            if enemy.cover > 0:
+            if enemy.position == target_position and enemy.cover > 0:
                 enemy.cover = max(0, enemy.cover - 20)
 
             self.metrics["damage_dealt"] += actual_damage
+
             if not enemy.is_alive():
                 self.metrics["kills"] += 1
 
@@ -112,7 +114,7 @@ class CombatEngine:
                 print(
                     f"Grenade hits {enemy.name} for {actual_damage} damage "
                     f"(hp={enemy.hp}, cover={enemy.cover})"
-                )
+            )
 
     def _decrement_cooldowns(self, soldier) -> None:
         updated = {}
