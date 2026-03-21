@@ -16,6 +16,8 @@ class CombatAnalytics:
                 is_enemy=False,
                 cover=0,
                 role="assault",
+                max_hp=10,
+                medkit_charges=0,
             ),
             Unit(
                 name="Sniper-1",
@@ -26,6 +28,20 @@ class CombatAnalytics:
                 is_enemy=False,
                 cover=0,
                 role="sniper",
+                max_hp=9,
+                medkit_charges=0,
+            ),
+            Unit(
+                name="Support-1",
+                hp=10,
+                aim=68,
+                ammo=7,
+                position=(0, 2),
+                is_enemy=False,
+                cover=0,
+                role="support",
+                max_hp=10,
+                medkit_charges=2,
             ),
         ]
 
@@ -39,6 +55,8 @@ class CombatAnalytics:
                 True,
                 cover=random.choice([0, 20]),
                 role="assault",
+                max_hp=6,
+                medkit_charges=0,
             ),
             Unit(
                 "Trooper",
@@ -49,6 +67,8 @@ class CombatAnalytics:
                 True,
                 cover=random.choice([0, 20]),
                 role="assault",
+                max_hp=7,
+                medkit_charges=0,
             ),
             Unit(
                 "StunLancer",
@@ -59,6 +79,8 @@ class CombatAnalytics:
                 True,
                 cover=random.choice([0, 20]),
                 role="assault",
+                max_hp=6,
+                medkit_charges=0,
             ),
         ]
 
@@ -104,6 +126,7 @@ class CombatAnalytics:
             "move": 0,
             "wait": 0,
             "overwatch": 0,
+            "heal": 0,
         }
 
         for _ in range(battles):

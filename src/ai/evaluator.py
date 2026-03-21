@@ -13,6 +13,7 @@ class ActionEvaluator:
                 "survival_multiplier": 1.0,
                 "flank_bonus": 70,
                 "overwatch_bonus": 5,
+                "heal_bonus": 0,
             },
             "sniper": {
                 "preferred_distance": 5,
@@ -21,6 +22,7 @@ class ActionEvaluator:
                 "survival_multiplier": 1.2,
                 "flank_bonus": 35,
                 "overwatch_bonus": 30,
+                "heal_bonus": 0,
             },
             "support": {
                 "preferred_distance": 3,
@@ -29,6 +31,7 @@ class ActionEvaluator:
                 "survival_multiplier": 1.3,
                 "flank_bonus": 40,
                 "overwatch_bonus": 18,
+                "heal_bonus": 60,
             },
         }
         return profiles.get(soldier.role, profiles["assault"])
@@ -111,6 +114,8 @@ class ActionEvaluator:
             is_enemy=soldier.is_enemy,
             cover=cover,
             role=soldier.role,
+            max_hp=soldier.max_hp,
+            medkit_charges=soldier.medkit_charges,
         )
 
         for enemy in enemies:
@@ -232,6 +237,41 @@ class ActionEvaluator:
             + low_hp_bonus
         )
 
+    def score_heal(self, soldier: Unit, allies: list[Unit], enemies: list[Unit]) -> tuple[float, str | None]:
+        role = self.get_role_profile(soldier)
+
+        if soldier.role != "support":
+            return -100, None
+
+        if soldier.medkit_charges <= 0:
+            return -100, None
+
+        valid_allies = [
+            ally for ally in allies
+            if ally.is_alive()
+            and ally.hp < ally.max_hp
+            and soldier.distance_to(ally) <= 2
+        ]
+
+        if not valid_allies:
+            return -100, None
+
+        def heal_priority(ally: Unit) -> float:
+            missing_hp = ally.max_hp - ally.hp
+            threat = self.estimate_position_threat(
+                soldier=ally,
+                enemies=enemies,
+                position=ally.position,
+                cover=ally.cover,
+            )
+            critical_bonus = 40 if ally.hp <= 4 else 0
+            return missing_hp * 12 + threat * 20 + critical_bonus
+
+        best_ally = max(valid_allies, key=heal_priority)
+        score = heal_priority(best_ally) + role["heal_bonus"]
+
+        return score, best_ally.name
+
     def get_cover_value_for_position(self, destination: tuple[int, int]) -> int:
         x, y = destination
 
@@ -295,6 +335,8 @@ class ActionEvaluator:
             is_enemy=soldier.is_enemy,
             cover=cover_value,
             role=soldier.role,
+            max_hp=soldier.max_hp,
+            medkit_charges=soldier.medkit_charges,
         )
 
         for enemy in enemies:
@@ -387,6 +429,7 @@ class ActionEvaluator:
     def choose_best_action(self, game_state: GameState) -> Action:
         soldier = game_state.soldier
         enemies = game_state.living_enemies()
+        allies = game_state.living_soldiers()
 
         if not enemies:
             return Action(action_type="wait", score=0)
@@ -422,6 +465,8 @@ class ActionEvaluator:
         if soldier.ammo == 0:
             return Action(action_type="reload", score=100)
 
+        heal_score, heal_target_name = self.score_heal(soldier, allies, enemies)
+
         possible_actions: list[Action] = []
         possible_actions.extend(shot_actions)
 
@@ -436,6 +481,14 @@ class ActionEvaluator:
             Action(
                 action_type="overwatch",
                 score=self.score_overwatch(soldier, visible_enemies, enemies),
+            )
+        )
+
+        possible_actions.append(
+            Action(
+                action_type="heal",
+                target_name=heal_target_name,
+                score=heal_score,
             )
         )
 

@@ -10,6 +10,8 @@ class Unit:
     is_enemy: bool
     cover: int = 0
     role: str = "assault"
+    max_hp: int = 10
+    medkit_charges: int = 0
 
     def is_alive(self) -> bool:
         return self.hp > 0
