@@ -17,6 +17,7 @@ class CombatEngine:
             "damage_dealt": 0,
             "damage_taken": 0,
             "kills": 0,
+            "grenades_used": 0,
             "action_counts": {
                 "shoot": 0,
                 "reload": 0,
@@ -25,6 +26,7 @@ class CombatEngine:
                 "overwatch": 0,
                 "heal": 0,
                 "hunker": 0,
+                "grenade": 0,
             },
         }
 
@@ -65,6 +67,48 @@ class CombatEngine:
                 print(
                     f"{attacker.name} missed {target.name} "
                     f"(target cover={target.cover}, hit chance={round(hit_chance, 2)})"
+                )
+
+    def _resolve_grenade(self, thrower, target_position: tuple[int, int] | None) -> None:
+        if target_position is None:
+            return
+
+        if thrower.grenade_charges <= 0:
+            return
+
+        blast_radius = 1
+        grenade_damage = 3
+        affected_enemies = [
+            enemy
+            for enemy in self.game_state.living_enemies()
+            if (
+                abs(enemy.position[0] - target_position[0])
+                + abs(enemy.position[1] - target_position[1])
+            ) <= blast_radius
+        ]
+
+        if not affected_enemies:
+            return
+
+        thrower.grenade_charges -= 1
+        self.metrics["grenades_used"] += 1
+
+        if self.verbose:
+            print(f"{thrower.name} throws grenade at {target_position}")
+
+        for enemy in affected_enemies:
+            previous_hp = enemy.hp
+            enemy.hp = max(0, enemy.hp - grenade_damage)
+            actual_damage = previous_hp - enemy.hp
+
+            self.metrics["damage_dealt"] += actual_damage
+            if not enemy.is_alive():
+                self.metrics["kills"] += 1
+
+            if self.verbose:
+                print(
+                    f"Grenade hits {enemy.name} for {actual_damage} damage "
+                    f"(hp={enemy.hp})"
                 )
 
     def _decrement_cooldowns(self, soldier) -> None:
@@ -270,6 +314,9 @@ class CombatEngine:
                     soldier.hunkered_down = True
                     if self.verbose:
                         print(f"{soldier.name} hunkers down and increases cover to {soldier.cover}")
+
+            elif action.action_type == "grenade":
+                self._resolve_grenade(soldier, action.target_position)
 
     def enemy_turn(self) -> None:
         for enemy in self.game_state.enemies:

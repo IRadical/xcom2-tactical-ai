@@ -18,6 +18,7 @@ class CombatAnalytics:
                 role="assault",
                 max_hp=10,
                 medkit_charges=0,
+                grenade_charges=1,
             ),
             Unit(
                 name="Sniper-1",
@@ -30,6 +31,7 @@ class CombatAnalytics:
                 role="sniper",
                 max_hp=9,
                 medkit_charges=0,
+                grenade_charges=0,
             ),
             Unit(
                 name="Support-1",
@@ -42,6 +44,7 @@ class CombatAnalytics:
                 role="support",
                 max_hp=10,
                 medkit_charges=2,
+                grenade_charges=1,
             ),
         ]
 
@@ -56,7 +59,6 @@ class CombatAnalytics:
                 cover=random.choice([0, 20]),
                 role="assault",
                 max_hp=6,
-                medkit_charges=0,
             ),
             Unit(
                 "Trooper",
@@ -68,7 +70,6 @@ class CombatAnalytics:
                 cover=random.choice([0, 20]),
                 role="assault",
                 max_hp=7,
-                medkit_charges=0,
             ),
             Unit(
                 "StunLancer",
@@ -80,7 +81,6 @@ class CombatAnalytics:
                 cover=random.choice([0, 20]),
                 role="assault",
                 max_hp=7,
-                medkit_charges=0,
             ),
         ]
 
@@ -107,6 +107,7 @@ class CombatAnalytics:
             "damage_dealt": metrics["damage_dealt"],
             "damage_taken": metrics["damage_taken"],
             "kills": metrics["kills"],
+            "grenades_used": metrics["grenades_used"],
             "action_counts": metrics["action_counts"],
         }
 
@@ -119,6 +120,7 @@ class CombatAnalytics:
         total_damage_dealt = 0
         total_damage_taken = 0
         total_kills = 0
+        total_grenades_used = 0
 
         total_action_counts = {
             "shoot": 0,
@@ -128,6 +130,7 @@ class CombatAnalytics:
             "overwatch": 0,
             "heal": 0,
             "hunker": 0,
+            "grenade": 0,
         }
 
         for _ in range(battles):
@@ -143,6 +146,7 @@ class CombatAnalytics:
             total_damage_dealt += result["damage_dealt"]
             total_damage_taken += result["damage_taken"]
             total_kills += result["kills"]
+            total_grenades_used += result["grenades_used"]
 
             for action_name, count in result["action_counts"].items():
                 total_action_counts[action_name] += count
@@ -158,5 +162,6 @@ class CombatAnalytics:
             "avg_damage_dealt": total_damage_dealt / battles,
             "avg_damage_taken": total_damage_taken / battles,
             "avg_kills": total_kills / battles,
+            "avg_grenades_used": total_grenades_used / battles,
             "action_counts": total_action_counts,
         }

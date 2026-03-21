@@ -6,3 +6,4 @@ class Action:
     score: float
     target_name: str | None = None
     destination: int | None = None 
+    target_position: tuple[int, int] | None = None

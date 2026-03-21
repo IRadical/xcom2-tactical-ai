@@ -15,6 +15,7 @@ def main():
     print("Average damage dealt:", round(results["avg_damage_dealt"], 2))
     print("Average damage taken:", round(results["avg_damage_taken"], 2))
     print("Average kills:", round(results["avg_kills"], 2))
+    print("Average grenades used:", round(results["avg_grenades_used"], 2))
 
     print("\nACTION DISTRIBUTION")
     print("---------------------")
