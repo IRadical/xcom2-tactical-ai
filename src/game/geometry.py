@@ -4,6 +4,18 @@ from dataclasses import dataclass
 
 Position = tuple[int, int, int]
 
+MAP_WIDTH = 10
+MAP_HEIGHT = 6
+MAX_Z = 2
+
+
+def is_within_bounds(pos: Position) -> bool:
+    x, y, z = pos
+    return (
+        0 <= x < MAP_WIDTH and
+        0 <= y < MAP_HEIGHT and
+        0 <= z <= MAX_Z
+    )
 
 @dataclass(frozen=True)
 class Tile:
@@ -13,7 +25,6 @@ class Tile:
 
     def to_position(self) -> Position:
         return (self.x, self.y, self.z)
-
 
 def manhattan_3d(a: Position, b: Position, z_weight: int = 2) -> int:
     dx = abs(a[0] - b[0])
@@ -80,4 +91,4 @@ def generate_neighbor_positions(origin: Position) -> list[Position]:
     if z > 0:
         candidates.append((x, y, z - 1))
 
-    return candidates
+    return [p for p in candidates if is_within_bounds(p)]

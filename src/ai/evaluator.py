@@ -160,7 +160,7 @@ class ActionEvaluator:
         close_range_bonus = role["close_range_bonus"] if distance <= 3 else 0
         long_range_bonus = role["long_range_bonus"] if distance >= 4 else 0
 
-        low_accuracy_penalty = 50 if hit_chance < 25 else 20 if hit_chance < 35 else 0
+        low_accuracy_penalty = 80 if hit_chance < 25 else 40 if hit_chance < 35 else 0
 
         current_position_threat = self.estimate_position_threat(
             soldier=soldier,
@@ -235,7 +235,7 @@ class ActionEvaluator:
         )
 
         return (
-            25
+            10
             + (best_visible_hit * 0.8)
             + role["overwatch_bonus"]
             + (current_position_threat * 12)
@@ -329,6 +329,9 @@ class ActionEvaluator:
         destination: Position,
         current_best_hit_chance: float,
     ) -> float:
+        if soldier.action_points == 1:
+         return -20  
+        
         if not enemies or soldier.action_points <= 0:
             return -100
 
@@ -415,11 +418,18 @@ class ActionEvaluator:
         self,
         soldier: Unit,
         enemies: list[Unit],
+        allies: list[Unit],
         current_best_hit_chance: float,
     ) -> list[Action]:
         actions: list[Action] = []
-
+        occupied_positions = {enemy.position for enemy in enemies}
+        occupied_positions.update({
+            ally.position for ally in allies
+            if ally.name != soldier.name
+        })        
         for destination in generate_neighbor_positions(soldier.position):
+            if destination in occupied_positions:
+                continue
             actions.append(
                 Action(
                     action_type="move",
@@ -486,8 +496,11 @@ class ActionEvaluator:
         kills_possible = sum(1 for enemy in enemies_hit if enemy.hp <= 3)
         enemies_in_cover = sum(1 for enemy in enemies_hit if enemy.cover > 0)
         wounded_bonus = sum(max(0, 6 - enemy.hp) * 5 for enemy in enemies_hit)
-        cluster_bonus = 30 if enemies_hit_count >= 2 else 0
+        cluster_bonus = 60 if enemies_hit_count >= 2 else 0
         cover_bonus = enemies_in_cover * 12
+
+        if enemies_in_cover >= 1:
+            cover_bonus += 25
 
         best_visible_hit = 0.0
         if visible_enemies:
@@ -526,6 +539,11 @@ class ActionEvaluator:
         ]
 
         shot_actions: list[Action] = []
+        if soldier.action_points == 2 and shot_actions:
+            best_shot = max(shot_actions, key=lambda a: a.score)
+            if best_shot.score > 20:
+                return best_shot
+            
         if soldier.ammo > 0:
             for enemy in visible_enemies:
                 shot_actions.append(
@@ -543,6 +561,19 @@ class ActionEvaluator:
                 for enemy in visible_enemies
             )
 
+        if soldier.action_points == 2 and best_hit_chance < 30:
+            move_actions = self.generate_move_actions(
+                soldier,
+                enemies,
+                allies,
+                best_hit_chance
+            )
+
+            best_move = max(move_actions, key=lambda a: a.score, default=None)
+
+            if best_move and best_move.score > 0:
+                return best_move
+
         grenade_actions: list[Action] = []
         for target_position, enemies_hit in self.get_grenade_candidates(soldier, enemies):
             grenade_actions.append(
@@ -558,8 +589,12 @@ class ActionEvaluator:
         possible_actions: list[Action] = []
         possible_actions.extend(shot_actions)
         possible_actions.extend(grenade_actions)
-        possible_actions.extend(self.generate_move_actions(soldier, enemies, best_hit_chance))
-
+        self.generate_move_actions(
+            soldier,
+            enemies,
+            allies,  
+            best_hit_chance
+        )
         possible_actions.append(Action("reload", self.score_reload(soldier, best_hit_chance, enemies)))
         possible_actions.append(Action("overwatch", self.score_overwatch(soldier, visible_enemies, enemies)))
         possible_actions.append(Action("heal", heal_score, target_name=heal_target_name))
