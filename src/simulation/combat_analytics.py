@@ -1,7 +1,10 @@
-from src.simulation.combat_engine import CombatEngine
+from __future__ import annotations
+
+import random
+
 from src.game.entities import Unit
 from src.game.game_state import GameState
-import random
+from src.simulation.combat_engine import CombatEngine
 
 
 class CombatAnalytics:
@@ -12,7 +15,7 @@ class CombatAnalytics:
                 hp=10,
                 aim=75,
                 ammo=5,
-                position=(0, 0),
+                position=(0, 0, 0),
                 is_enemy=False,
                 cover=0,
                 role="assault",
@@ -25,7 +28,7 @@ class CombatAnalytics:
                 hp=9,
                 aim=80,
                 ammo=5,
-                position=(0, 1),
+                position=(0, 1, 1),
                 is_enemy=False,
                 cover=0,
                 role="sniper",
@@ -38,7 +41,7 @@ class CombatAnalytics:
                 hp=10,
                 aim=68,
                 ammo=5,
-                position=(0, 2),
+                position=(0, 2, 0),
                 is_enemy=False,
                 cover=0,
                 role="support",
@@ -50,34 +53,34 @@ class CombatAnalytics:
 
         enemies = [
             Unit(
-                "Sectoid",
-                random.randint(4, 6),
-                65,
-                2,
-                (random.randint(3, 6), random.randint(0, 3)),
-                True,
+                name="Sectoid",
+                hp=random.randint(4, 6),
+                aim=65,
+                ammo=2,
+                position=(random.randint(3, 6), random.randint(0, 3), random.choice([0, 1])),
+                is_enemy=True,
                 cover=random.choice([0, 20]),
                 role="assault",
                 max_hp=6,
             ),
             Unit(
-                "Trooper",
-                random.randint(5, 7),
-                60,
-                3,
-                (random.randint(4, 8), random.randint(1, 4)),
-                True,
+                name="Trooper",
+                hp=random.randint(5, 7),
+                aim=60,
+                ammo=3,
+                position=(random.randint(4, 8), random.randint(1, 4), random.choice([0, 1])),
+                is_enemy=True,
                 cover=random.choice([0, 20]),
                 role="assault",
                 max_hp=7,
             ),
             Unit(
-                "StunLancer",
-                random.randint(5, 7),
-                62,
-                3,
-                (random.randint(5, 8), random.randint(0, 4)),
-                True,
+                name="StunLancer",
+                hp=random.randint(5, 7),
+                aim=62,
+                ammo=3,
+                position=(random.randint(5, 8), random.randint(0, 4), random.choice([0, 1])),
+                is_enemy=True,
                 cover=random.choice([0, 20]),
                 role="assault",
                 max_hp=7,

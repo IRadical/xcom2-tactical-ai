@@ -1,6 +1,10 @@
-from src.game.game_state import GameState
-from src.ai.evaluator import ActionEvaluator
+from __future__ import annotations
+
 import random
+
+from src.ai.evaluator import ActionEvaluator
+from src.game.game_state import GameState
+from src.game.geometry import within_grenade_radius
 
 
 class CombatEngine:
@@ -45,8 +49,7 @@ class CombatEngine:
         if hit_roll <= hit_chance:
             damage = random.randint(2, 4)
             previous_hp = target.hp
-            target.hp -= damage
-            target.hp = max(0, target.hp)
+            target.hp = max(0, target.hp - damage)
             actual_damage = previous_hp - target.hp
 
             if attacker.is_enemy:
@@ -60,32 +63,24 @@ class CombatEngine:
             if self.verbose:
                 print(
                     f"{attacker.name} hits {target.name} for {actual_damage} damage "
-                    f"(hp={target.hp}, target cover={target.cover}, hit chance={round(hit_chance, 2)})"
+                    f"(hp={target.hp}, cover={target.cover}, hit={round(hit_chance, 2)})"
                 )
         else:
             if self.verbose:
                 print(
                     f"{attacker.name} missed {target.name} "
-                    f"(target cover={target.cover}, hit chance={round(hit_chance, 2)})"
+                    f"(cover={target.cover}, hit={round(hit_chance, 2)})"
                 )
 
-    def _resolve_grenade(self, thrower, target_position: tuple[int, int] | None) -> None:
-        if target_position is None:
+    def _resolve_grenade(self, thrower, target_position) -> None:
+        if target_position is None or thrower.grenade_charges <= 0:
             return
 
-        if thrower.grenade_charges <= 0:
-            return
-
-        blast_radius = 1
         grenade_damage = 3
-
         affected_enemies = [
             enemy
             for enemy in self.game_state.living_enemies()
-            if (
-                abs(enemy.position[0] - target_position[0])
-                + abs(enemy.position[1] - target_position[1])
-            ) <= blast_radius
+            if within_grenade_radius(target_position, enemy.position, radius=1)
         ]
 
         if not affected_enemies:
@@ -106,7 +101,6 @@ class CombatEngine:
                 enemy.cover = max(0, enemy.cover - 20)
 
             self.metrics["damage_dealt"] += actual_damage
-
             if not enemy.is_alive():
                 self.metrics["kills"] += 1
 
@@ -114,7 +108,7 @@ class CombatEngine:
                 print(
                     f"Grenade hits {enemy.name} for {actual_damage} damage "
                     f"(hp={enemy.hp}, cover={enemy.cover})"
-            )
+                )
 
     def _decrement_cooldowns(self, soldier) -> None:
         updated = {}
@@ -129,13 +123,13 @@ class CombatEngine:
             soldier.cover = max(0, soldier.cover - 20)
             soldier.hunkered_down = False
 
+    def _reset_action_points(self, soldier) -> None:
+        soldier.action_points = 2
+
     def _choose_focus_target(self, soldiers, enemies):
         visible_enemies = [
             enemy for enemy in enemies
-            if any(
-                self.evaluator.has_line_of_sight(soldier, enemy)
-                for soldier in soldiers
-            )
+            if any(self.evaluator.has_line_of_sight(soldier, enemy) for soldier in soldiers)
         ]
 
         if not visible_enemies:
@@ -155,7 +149,6 @@ class CombatEngine:
 
             low_hp_bonus = max(0, 10 - enemy.hp) * 10
             visibility_bonus = visible_count * 20
-
             return avg_hit + low_hp_bonus + visibility_bonus
 
         best_enemy = max(visible_enemies, key=target_priority)
@@ -230,10 +223,8 @@ class CombatEngine:
     def _resolve_heal(self, healer, target_name: str | None) -> None:
         if target_name is None:
             return
-
         if healer.medkit_charges <= 0:
             return
-
         if healer.ability_cooldowns.get("heal", 0) > 0:
             return
 
@@ -246,16 +237,88 @@ class CombatEngine:
             return
 
         target = valid_targets[0]
-        heal_amount = 4
-
         previous_hp = target.hp
-        target.hp = min(target.max_hp, target.hp + heal_amount)
+        target.hp = min(target.max_hp, target.hp + 4)
         actual_heal = target.hp - previous_hp
         healer.medkit_charges -= 1
         healer.ability_cooldowns["heal"] = 2
 
         if self.verbose:
             print(f"{healer.name} heals {target.name} for {actual_heal} HP")
+
+    def _consume_action_points(self, soldier, action_type: str) -> None:
+        if action_type in {"shoot", "overwatch", "grenade", "heal", "hunker"}:
+            soldier.action_points = 0
+        elif action_type in {"move", "reload"}:
+            soldier.action_points = max(0, soldier.action_points - 1)
+        else:
+            soldier.action_points = 0
+
+    def _run_single_soldier_turn(self, soldier) -> None:
+        while soldier.is_alive() and soldier.action_points > 0 and self.game_state.living_enemies():
+            action = self._choose_action_for_soldier(soldier)
+
+            if action.action_type in self.metrics["action_counts"]:
+                self.metrics["action_counts"][action.action_type] += 1
+
+            if self.verbose:
+                print(
+                    f"\n{soldier.name} decision: {action.action_type} "
+                    f"(ap={soldier.action_points})"
+                )
+
+            if action.action_type == "shoot":
+                targets = [
+                    enemy for enemy in self.game_state.enemies
+                    if enemy.is_alive() and enemy.name == action.target_name
+                ]
+                if targets and soldier.ammo > 0:
+                    soldier.ammo -= 1
+                    self.resolve_shot(soldier, targets[0])
+                self._consume_action_points(soldier, "shoot")
+
+            elif action.action_type == "reload":
+                soldier.ammo = 5
+                if self.verbose:
+                    print(f"{soldier.name} reloads weapon")
+                self._consume_action_points(soldier, "reload")
+
+            elif action.action_type == "move":
+                if action.destination is not None:
+                    soldier.position = action.destination
+                    soldier.cover = self.evaluator.get_cover_value_for_position(action.destination)
+                    if self.verbose:
+                        print(
+                            f"{soldier.name} moves to {action.destination} "
+                            f"and gains cover {soldier.cover}"
+                        )
+                self._consume_action_points(soldier, "move")
+
+            elif action.action_type == "overwatch":
+                if soldier.ammo > 0:
+                    self.overwatch_queue.add(soldier.name)
+                    if self.verbose:
+                        print(f"{soldier.name} enters overwatch")
+                self._consume_action_points(soldier, "overwatch")
+
+            elif action.action_type == "heal":
+                self._resolve_heal(soldier, action.target_name)
+                self._consume_action_points(soldier, "heal")
+
+            elif action.action_type == "hunker":
+                if not soldier.hunkered_down:
+                    soldier.cover = min(60, soldier.cover + 20)
+                    soldier.hunkered_down = True
+                    if self.verbose:
+                        print(f"{soldier.name} hunkers down and increases cover to {soldier.cover}")
+                self._consume_action_points(soldier, "hunker")
+
+            elif action.action_type == "grenade":
+                self._resolve_grenade(soldier, action.target_position)
+                self._consume_action_points(soldier, "grenade")
+
+            else:
+                self._consume_action_points(soldier, "wait")
 
     def player_turn(self) -> None:
         soldiers = self.game_state.living_soldiers()
@@ -265,6 +328,7 @@ class CombatEngine:
         for soldier in soldiers:
             self._decrement_cooldowns(soldier)
             self._reset_hunker_if_needed(soldier)
+            self._reset_action_points(soldier)
 
         self.focus_target_name = self._choose_focus_target(soldiers, enemies)
 
@@ -272,56 +336,7 @@ class CombatEngine:
             print(f"\nSquad focus target: {self.focus_target_name}")
 
         for soldier in soldiers:
-            action = self._choose_action_for_soldier(soldier)
-
-            if action.action_type in self.metrics["action_counts"]:
-                self.metrics["action_counts"][action.action_type] += 1
-
-            if self.verbose:
-                print(f"\n{soldier.name} decision: {action.action_type}")
-
-            if action.action_type == "shoot":
-                targets = [
-                    enemy for enemy in self.game_state.enemies
-                    if enemy.is_alive() and enemy.name == action.target_name
-                ]
-
-                if targets and soldier.ammo > 0:
-                    soldier.ammo -= 1
-                    self.resolve_shot(soldier, targets[0])
-
-            elif action.action_type == "reload":
-                soldier.ammo = 5
-                if self.verbose:
-                    print(f"{soldier.name} reloads weapon")
-
-            elif action.action_type == "move":
-                soldier.position = action.destination
-                soldier.cover = self.evaluator.get_cover_value_for_position(action.destination)
-                if self.verbose:
-                    print(
-                        f"{soldier.name} moves to {action.destination} "
-                        f"and gains cover {soldier.cover}"
-                    )
-
-            elif action.action_type == "overwatch":
-                if soldier.ammo > 0:
-                    self.overwatch_queue.add(soldier.name)
-                    if self.verbose:
-                        print(f"{soldier.name} enters overwatch")
-
-            elif action.action_type == "heal":
-                self._resolve_heal(soldier, action.target_name)
-
-            elif action.action_type == "hunker":
-                if not soldier.hunkered_down:
-                    soldier.cover = min(60, soldier.cover + 20)
-                    soldier.hunkered_down = True
-                    if self.verbose:
-                        print(f"{soldier.name} hunkers down and increases cover to {soldier.cover}")
-
-            elif action.action_type == "grenade":
-                self._resolve_grenade(soldier, action.target_position)
+            self._run_single_soldier_turn(soldier)
 
     def enemy_turn(self) -> None:
         for enemy in self.game_state.enemies:
