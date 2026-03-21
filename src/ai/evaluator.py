@@ -372,7 +372,7 @@ class ActionEvaluator:
         enemies_hit_count = len(enemies_hit)
         kills_possible = sum(1 for enemy in enemies_hit if enemy.hp <= 3)
         wounded_bonus = sum(max(0, 8 - enemy.hp) * 6 for enemy in enemies_hit)
-        cover_bonus = sum(20 if enemy.cover > 0 else 0 for enemy in enemies_hit)
+        cover_bonus = sum(35 if enemy.cover > 0 else 0 for enemy in enemies_hit)
         cluster_bonus = 25 if enemies_hit_count >= 2 else 0
         scarcity_penalty = 15 if soldier.grenade_charges == 1 else 0
 
