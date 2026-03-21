@@ -23,6 +23,7 @@ class CombatEngine:
                 "move": 0,
                 "wait": 0,
                 "overwatch": 0,
+                "heal": 0,
             },
         }
 
@@ -158,6 +159,32 @@ class CombatEngine:
 
             if not enemy.is_alive():
                 break
+
+    def _resolve_heal(self, healer, target_name: str | None):
+        if target_name is None:
+            return
+        
+        if healer.medkit_charges <= 0:
+            return
+        
+        valid_targets = [
+            ally for ally in self.game_state.living_soldiers()
+            if ally.name == target_name and healer.distance_to(ally) <= 2
+        ]
+
+        if not valid_targets:
+            return
+        
+        target = valid_targets[0]
+        heal_amount = 4
+
+        previous_hp = target.hp
+        target.hp = min(target.max_hp, target.hp + heal_amount)
+        actual_heal = target.hp - previous_hp
+        healer.medkit_charges -= 1
+
+        if self.verbose:
+            print(f"{healer.name} heals {target.name} for {actual_heal} HP")
 
     def player_turn(self) -> None:
         soldiers = self.game_state.living_soldiers()
