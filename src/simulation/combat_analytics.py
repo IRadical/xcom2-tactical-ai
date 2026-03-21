@@ -8,22 +8,24 @@ class CombatAnalytics:
     def run_single_battle(self) -> dict:
         soldiers = [
             Unit(
-                name="Ranger-1",
+                name="Assault-1",
                 hp=10,
                 aim=75,
                 ammo=5,
                 position=(0, 0),
                 is_enemy=False,
                 cover=0,
+                role="assault",
             ),
             Unit(
-                name="Ranger-2",
-                hp=10,
-                aim=72,
+                name="Sniper-1",
+                hp=9,
+                aim=80,
                 ammo=5,
                 position=(0, 1),
                 is_enemy=False,
                 cover=0,
+                role="sniper",
             ),
         ]
 
@@ -36,6 +38,7 @@ class CombatAnalytics:
                 (random.randint(3, 6), random.randint(0, 3)),
                 True,
                 cover=random.choice([0, 20]),
+                role="assault",
             ),
             Unit(
                 "Trooper",
@@ -45,6 +48,7 @@ class CombatAnalytics:
                 (random.randint(4, 8), random.randint(1, 4)),
                 True,
                 cover=random.choice([0, 20]),
+                role="assault",
             ),
             Unit(
                 "StunLancer",
@@ -54,6 +58,7 @@ class CombatAnalytics:
                 (random.randint(5, 8), random.randint(0, 4)),
                 True,
                 cover=random.choice([0, 20]),
+                role="assault",
             ),
         ]
 
