@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 @dataclass
 class Unit:
@@ -12,6 +12,8 @@ class Unit:
     role: str = "assault"
     max_hp: int = 10
     medkit_charges: int = 0
+    ability_cooldowns: dict[str, int] = field(default_factory = dict)
+    hunkered_down: bool = False
 
     def is_alive(self) -> bool:
         return self.hp > 0

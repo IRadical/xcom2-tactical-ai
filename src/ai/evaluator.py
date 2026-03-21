@@ -14,6 +14,7 @@ class ActionEvaluator:
                 "flank_bonus": 70,
                 "overwatch_bonus": 5,
                 "heal_bonus": 0,
+                "hunker_bonus": 8,
             },
             "sniper": {
                 "preferred_distance": 5,
@@ -23,6 +24,7 @@ class ActionEvaluator:
                 "flank_bonus": 35,
                 "overwatch_bonus": 30,
                 "heal_bonus": 0,
+                "hunker_bonus": 20,
             },
             "support": {
                 "preferred_distance": 3,
@@ -32,6 +34,7 @@ class ActionEvaluator:
                 "flank_bonus": 40,
                 "overwatch_bonus": 18,
                 "heal_bonus": 60,
+                "hunker_bonus": 25,
             },
         }
         return profiles.get(soldier.role, profiles["assault"])
@@ -116,6 +119,8 @@ class ActionEvaluator:
             role=soldier.role,
             max_hp=soldier.max_hp,
             medkit_charges=soldier.medkit_charges,
+            ability_cooldowns=dict(soldier.ability_cooldowns),
+            hunkered_down=soldier.hunkered_down,
         )
 
         for enemy in enemies:
@@ -245,6 +250,9 @@ class ActionEvaluator:
 
         if soldier.medkit_charges <= 0:
             return -100, None
+        
+        if soldier.ability_cooldowns.get("heal", 0) > 0:
+            return -100, None
 
         valid_allies = [
             ally for ally in allies
@@ -271,6 +279,30 @@ class ActionEvaluator:
         score = heal_priority(best_ally) + role["heal_bonus"]
 
         return score, best_ally.name
+    
+    def score_hunker(self, soldier: Unit, enemies: list[Unit], best_hit_chance: float) -> float:
+        role = self.get_role_profile(soldier)
+
+        if soldier.hunkered_down:
+            return -100
+        
+        current_position_threat = self.estimate_position_threat(
+            soldier=soldier,
+            enemies=enemies,
+            position=soldier.position,
+            cover=soldier.cover,   
+        )
+
+        low_hp_bonus = 35 if soldier.hp <= 4 else 15 if soldier.hp <= 7 else 0
+        poor_shot_bonus = 20 if best_hit_chance < 25 else 0
+
+        return(
+            10
+            + role["hunker_bonus"]
+            + (current_position_threat * 30)
+            + low_hp_bonus
+            + poor_shot_bonus
+        )
 
     def get_cover_value_for_position(self, destination: tuple[int, int]) -> int:
         x, y = destination
@@ -337,6 +369,8 @@ class ActionEvaluator:
             role=soldier.role,
             max_hp=soldier.max_hp,
             medkit_charges=soldier.medkit_charges,
+            ability_cooldowns= dict(soldier.ability_cooldowns),
+            hunkered_down=soldier.hunkered_down,
         )
 
         for enemy in enemies:
@@ -489,6 +523,13 @@ class ActionEvaluator:
                 action_type="heal",
                 target_name=heal_target_name,
                 score=heal_score,
+            )
+        )
+
+        possible_actions.append(
+            Action(
+                action_type="hunker",
+                score=self.score_hunker(soldier, enemies, best_hit_chance),
             )
         )
 
