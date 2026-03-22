@@ -102,8 +102,13 @@ def game_state_from_exported_battle_state(battle_state: dict[str, Any]) -> GameS
 
     active_soldier = next((unit for unit in soldiers if unit.action_points > 0), None)
 
-    return GameState(
+    game_state = GameState(
         soldiers=soldiers,
         enemies=enemies,
         active_soldier=active_soldier,
     )
+
+    # Atributo extra para integración con XCOM real
+    game_state.available_move_tiles = battle_state.get("move_tiles", [])
+
+    return game_state
