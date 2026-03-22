@@ -10,6 +10,17 @@ def parse_value(value: str) -> Any:
     if value == "":
         return ""
 
+    # Caso especial: HP en formato "5.0000/6.0000"
+    if "/" in value:
+        left, right = value.split("/", 1)
+        try:
+            return {
+                "current": float(left.strip()),
+                "max": float(right.strip()),
+            }
+        except ValueError:
+            return value
+
     try:
         if "." in value:
             return float(value)
@@ -32,6 +43,22 @@ def parse_export_payload(payload: str) -> dict[str, Any]:
     return result
 
 
+def normalize_unit(unit: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(unit)
+
+    # Team ahora viene como etiqueta directa
+    if "Team" in normalized and "TeamName" not in normalized:
+        normalized["TeamName"] = normalized["Team"]
+
+    # HP ahora viene combinado como dict {"current": x, "max": y}
+    hp_value = normalized.get("HP")
+    if isinstance(hp_value, dict):
+        normalized["HP"] = hp_value["current"]
+        normalized["MaxHP"] = hp_value["max"]
+
+    return normalized
+
+
 def parse_battle_state_from_log(log_path: str | Path) -> dict[str, Any]:
     log_path = Path(log_path)
 
@@ -47,7 +74,8 @@ def parse_battle_state_from_log(log_path: str | Path) -> dict[str, Any]:
 
             if "EXPORT_UNIT|" in line:
                 payload = line.split("EXPORT_UNIT|", 1)[1]
-                units.append(parse_export_payload(payload))
+                unit_data = parse_export_payload(payload)
+                units.append(normalize_unit(unit_data))
 
             elif "EXPORT_SUMMARY|" in line:
                 payload = line.split("EXPORT_SUMMARY|", 1)[1]
