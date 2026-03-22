@@ -62,28 +62,51 @@ def parse_battle_state_from_log(log_path: str | Path) -> dict[str, Any]:
     summary: dict[str, Any] = {}
     active_unit_id: int | None = None
 
+    in_units_block = False
+    in_moves_block = False
+
     with log_path.open("r", encoding="utf-8", errors="ignore") as f:
         for raw_line in f:
             line = raw_line.strip()
 
-            if "EXPORT_UNIT|" in line:
+            if "DEBUG_EXPORT_UNITS_BEGIN" in line:
+                units = []
+                summary = {}
+                in_units_block = True
+                in_moves_block = False
+                continue
+
+            if "DEBUG_EXPORT_UNITS_END" in line:
+                in_units_block = False
+                continue
+
+            if "EXPORT_ACTIVE_MOVES_BEGIN|" in line:
+                payload = line.split("EXPORT_ACTIVE_MOVES_BEGIN|", 1)[1]
+                active_info = parse_export_payload(payload)
+                active_unit_id = int(active_info["UnitID"]) if "UnitID" in active_info else None
+                move_tiles = []
+                in_moves_block = True
+                continue
+
+            if "EXPORT_ACTIVE_MOVES_END" in line:
+                in_moves_block = False
+                continue
+
+            if in_units_block and "EXPORT_UNIT|" in line:
                 payload = line.split("EXPORT_UNIT|", 1)[1]
                 unit_data = parse_export_payload(payload)
                 units.append(normalize_unit(unit_data))
+                continue
 
-            elif "EXPORT_ACTIVE_MOVES_BEGIN|" in line:
-                payload = line.split("EXPORT_ACTIVE_MOVES_BEGIN|", 1)[1]
-                active_info = parse_export_payload(payload)
-                if "UnitID" in active_info:
-                    active_unit_id = int(active_info["UnitID"])
-
-            elif "ACTIVE_MOVE_TILE|" in line:
-                payload = line.split("ACTIVE_MOVE_TILE|", 1)[1]
-                move_tiles.append(parse_export_payload(payload))
-
-            elif "EXPORT_SUMMARY|" in line:
+            if in_units_block and "EXPORT_SUMMARY|" in line:
                 payload = line.split("EXPORT_SUMMARY|", 1)[1]
                 summary = parse_export_payload(payload)
+                continue
+
+            if in_moves_block and "ACTIVE_MOVE_TILE|" in line:
+                payload = line.split("ACTIVE_MOVE_TILE|", 1)[1]
+                move_tiles.append(parse_export_payload(payload))
+                continue
 
     return {
         "units": units,
