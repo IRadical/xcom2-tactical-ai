@@ -31,6 +31,15 @@ def main() -> None:
     battle_state = load_latest_battle_state(log_path)
     game_state = game_state_from_exported_battle_state(battle_state)
 
+    print("SUMMARY:")
+    print(battle_state["summary"])
+    print()
+
+    print("MOVE TILES:")
+    for tile in battle_state["move_tiles"][:10]:
+        print(tile)
+
+    print()
     print("SOLDIERS:")
     for soldier in game_state.soldiers:
         print_unit(soldier)
