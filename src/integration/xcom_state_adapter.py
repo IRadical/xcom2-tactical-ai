@@ -10,20 +10,56 @@ def infer_role(unit_name: str, is_enemy: bool) -> str:
     if is_enemy:
         return "enemy"
 
+    lower_name = unit_name.lower()
+
+    if "sniper" in lower_name:
+        return "sniper"
+    if "grenadier" in lower_name:
+        return "grenadier"
+    if "specialist" in lower_name:
+        return "support"
+    if "ranger" in lower_name:
+        return "assault"
+
     return "assault"
 
 
+def infer_cover(unit_data: dict[str, Any]) -> int:
+    return int(unit_data.get("Cover", 0))
+
+
+def infer_hunkered_down(unit_data: dict[str, Any]) -> bool:
+    raw = unit_data.get("HunkeredDown", False)
+    return bool(raw)
+
+
 def infer_max_hp(unit_data: dict[str, Any]) -> int:
-    hp = int(unit_data.get("HP", 1))
+    if "MaxHP" in unit_data:
+        return int(float(unit_data["MaxHP"]))
+
+    hp = int(float(unit_data.get("HP", 1)))
     return hp if hp > 0 else 1
 
 
+def infer_medkit_charges(unit_data: dict[str, Any], is_enemy: bool) -> int:
+    if is_enemy:
+        return 0
+    return int(unit_data.get("MedkitCharges", 0))
+
+
+def infer_grenade_charges(unit_data: dict[str, Any], is_enemy: bool) -> int:
+    if is_enemy:
+        return 0
+    return int(unit_data.get("GrenadeCharges", 0))
+
+
 def unit_from_export(unit_data: dict[str, Any]) -> Unit:
-    is_enemy = unit_data.get("TeamName") == "ENEMY"
+    team_name = str(unit_data.get("TeamName", "OTHER"))
+    is_enemy = team_name == "ENEMY"
 
     name = str(unit_data.get("Name", "Unknown"))
-    hp = int(unit_data.get("HP", 1))
-    aim = int(unit_data.get("Aim", 0))
+    hp = int(float(unit_data.get("HP", 1)))
+    aim = int(float(unit_data.get("Aim", 0)))
     ammo = int(unit_data.get("Ammo", 0))
     action_points = int(unit_data.get("AP", 0))
 
@@ -39,13 +75,13 @@ def unit_from_export(unit_data: dict[str, Any]) -> Unit:
         ammo=ammo,
         position=position,
         is_enemy=is_enemy,
-        cover=0,
+        cover=infer_cover(unit_data),
         role=infer_role(name, is_enemy),
         max_hp=infer_max_hp(unit_data),
-        medkit_charges=0,
-        grenade_charges=0,
+        medkit_charges=infer_medkit_charges(unit_data, is_enemy),
+        grenade_charges=infer_grenade_charges(unit_data, is_enemy),
         ability_cooldowns={},
-        hunkered_down=False,
+        hunkered_down=infer_hunkered_down(unit_data),
         action_points=action_points,
     )
 
