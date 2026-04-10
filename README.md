@@ -88,14 +88,16 @@ CURRENT LIMITATION: The AI currently lacks full offensive context from the real 
 HOW TO RUN
 RUN SIMULATION
 Bash
-python main.py
+```python main.py```
 TEST THE XCOM 2 BRIDGE PARSER
 Bash
-python -m tests.test_xcom_bridge
+```python -m tests.test_xcom_bridge```
 RUN AI DECISION OVER REAL XCOM 2 STATE
 Bash
-python -m tests.test_xcom_decision_bridge
+```python -m tests.test_xcom_decision_bridge```
+
 NEXT MILESTONES
+
 🔴 HIGH PRIORITY
 EXPORT visible targets and real hit chances from XCOM 2.
 
