@@ -1,150 +1,117 @@
-# Tactical AI Decision System (XCOM-Style Combat)
+XCOM 2 TACTICAL AI BRIDGE
+A Python-based tactical AI system for XCOM-style turn-based combat, now extended with a live integration bridge to XCOM 2: WAR OF THE CHOSEN.
 
-A Python-based AI agent focused on tactical decision-making and game state evaluation, inspired by the mechanics of XCOM-style turn-based combat.
+The project started as a utility-based tactical decision system in Python and has evolved into a hybrid architecture that:
 
-The purpose of this project is to build an intelligent agent capable of analyzing combat scenarios, evaluating multiple possible actions, and selecting the most effective move using a **utility-based scoring model**.
+SIMULATES tactical combat in Python.
 
----
+EVALUATES battlefield decisions with a scoring model.
 
-## Overview
+READS real tactical state exported from XCOM 2 through a custom mod.
 
-This project explores how an AI can make decisions in a turn-based tactical environment by scoring available actions such as attacking, moving, or reloading.
+PREPARES game-state data for real in-game decision-making.
 
-Instead of choosing randomly, the agent evaluates the current battlefield state and prioritizes the action with the highest tactical value.
+OVERVIEW
+This project explores how an AI agent can make tactical decisions in a turn-based combat environment inspired by XCOM.
 
----
+Instead of choosing actions randomly, the system evaluates the battlefield state and scores possible actions based on HEURISTICS such as:
 
-## Key Features
+Offense and hit probability.
 
-### Action Evaluation System
-A decision-making engine that scores available actions such as shooting, moving, and reloading.
+Movement opportunities and flanking.
 
-### Probability Estimation
-Dynamic hit chance calculation based on combat context and game state conditions.
+Ammunition and action point management.
 
-### Combat Simulation
-A simulation core that handles turn flow, damage resolution, and unit health updates.
+Unit positioning and tactical context.
 
-### Scoring-Based Selection
-The AI selects actions based on tactical utility rather than random behavior.
+The project now features TWO COMPLEMENTARY LAYERS:
 
----
+PYTHON TACTICAL AI CORE: A standalone combat simulator and evaluator for XCOM-style decisions.
 
-## Project Architecture
+XCOM 2 INTEGRATION BRIDGE: A mod + parser pipeline that exports tactical state from XCOM 2 and converts it into Python GameState objects.
 
-The codebase follows **Object-Oriented Design (OOD)** principles to keep decision logic separated from game rules and combat execution.
+CURRENT CAPABILITIES
+🛡️ PYTHON TACTICAL AI
+Utility-based action evaluation.
 
-```text
-src/
- ├── ai/
- │   └── evaluator.py        # AI scoring logic and decision-making
- ├── game/
- │   ├── actions.py          # Action definitions (Shoot, Move, Reload)
- │   ├── entities.py         # Unit models (Soldiers, Aliens, Stats)
- │   └── game_state.py       # Current battlefield snapshot
- └── engine/
-     └── combat_engine.py    # Turn processing and event resolution
-```
+Tactical combat simulation.
 
----
+Action scoring for shooting, moving, reloading, overwatch, and grenades.
 
-## Tech Stack
+Structured UNIT and GAMESTATE models.
 
-- Python 3.x
-- Pytest
+🛰️ XCOM 2 BRIDGE
+Detects TACTICAL HUD runtime from the game.
 
----
+Exports live tactical battlefield snapshots from XCOM 2 WOTC.
 
-## Project Status
+Parses combat state from Launch.log.
 
-This project is currently in the **Core Logic Development Phase**.
+Detects the ACTIVE SOLDIER and parses legal movement tiles.
 
-### Implemented
+Runs the evaluator on real in-game state.
 
-- Basic combat simulation and turn flow
-- Utility-based action scoring
-- AI agent decision-making logic
+Produces exportable decision strings.
 
-### Planned Improvements
+PROJECT ARCHITECTURE
+Plaintext
+SRC/
+├── AI/
+│   └── evaluator.py                # AI SCORING LOGIC AND ACTION SELECTION
+├── GAME/
+│   ├── actions.py                  # ACTION MODELS
+│   ├── entities.py                 # UNIT MODEL
+│   ├── game_state.py               # BATTLEFIELD STATE MODEL
+│   └── geometry.py                 # POSITION TYPING / GEOMETRY HELPERS
+├── INTEGRATION/
+│   ├── xcom_log_bridge.py          # READS TACTICAL SNAPSHOTS FROM XCOM 2 LOGS
+│   ├── xcom_state_adapter.py       # CONVERTS LOG DATA INTO PYTHON MODELS
+│   ├── xcom_action_formatter.py    # FORMATS ACTIONS INTO EXPORTABLE STRINGS
+│   └── xcom_decision_bridge.py     # END-TO-END BRIDGE: LOG -> AI -> ACTION
+├── SIMULATION/
+│   ├── combat_engine.py            # TACTICAL COMBAT SIMULATION ENGINE
+│   └── combat_analytics.py         # METRICS AND COMBAT STATISTICS
+└── VISUALIZATION/
+    ├── simulate_battle.py          # SIMULATION RUNNER
+    └── tactical_renderer.py        # TACTICAL RENDERING HELPERS
+TECH STACK
+PYTHON: 3.X, NUMPY for analytics, Pytest-style validation scripts.
 
-- Cover evaluation and tactical positioning
-- Flanking logic and multi-enemy scenarios
-- Integration with an external tactical game environment
+GAME INTEGRATION: UNREALSCRIPT (XCOM 2 WOTC SDK), MODBUDDY.
 
----
+WORKFLOW: Live log parsing and structured world-state export.
 
-## Technical Motivation
+CURRENT STATUS
+🟢 TACTICAL AI CORE
+STABLE. Utility-based decision logic and structured modeling are fully functional.
 
-This project explores key challenges in game AI development.
+🟡 XCOM 2 INTEGRATION
+WORKING PROTOTYPE. Live export and parsing are implemented.
 
-### Tactical AI Systems
+CURRENT LIMITATION: The AI currently lacks full offensive context from the real game (Visibility/LOS, real hit chances, and target cover). Because of this, the evaluator may choose conservative actions like OVERWATCH as a fallback.
 
-Modeling intelligent behavior in environments with uncertainty and probability-based outcomes.
-
-### Software Architecture
-
-Maintaining a clear separation between **Perception (Game State)** and **Decision-Making (Evaluator)**.
-
-### Utility Algorithms
-
-Applying heuristic scoring systems to drive decision-making in tactical strategy environments.
-
----
-
-## How to Run
-
-Run the following command to execute the simulation and see the AI decisions in the terminal:
-
-```bash
+HOW TO RUN
+RUN SIMULATION
+Bash
 python main.py
-```
+TEST THE XCOM 2 BRIDGE PARSER
+Bash
+python -m tests.test_xcom_bridge
+RUN AI DECISION OVER REAL XCOM 2 STATE
+Bash
+python -m tests.test_xcom_decision_bridge
+NEXT MILESTONES
+🔴 HIGH PRIORITY
+EXPORT visible targets and real hit chances from XCOM 2.
 
----
+EXPORT target cover and flanking states.
 
-## Example Output
+IMPLEMENT a command channel to write actions back to the game.
 
-```text
------ TURN 1 -----
+🔵 MEDIUM PRIORITY
+Improve movement selection using real legal tiles.
 
-AI decision: shoot  
-Hit! Sectoid takes 5 damage (hp=0)
+Integrate LINE-OF-SIGHT (LOS) calculations into the evaluator.
 
-Battle ended
-
------ TURN 2 -----
-
-AI decision: shoot  
-Hit! Trooper takes 3 damage (hp=3)
-
-Battle ended
-
------ TURN 3 -----
-
-AI decision: shoot  
-Hit! Trooper takes 4 damage (hp=-1)
-
-Battle ended
-
-AI decision: shoot  
-Hit! Sectoid takes 4 damage (hp=1)
-
-Battle ended
-```
-
----
-
-## Future Goals
-
-The long-term goal is to evolve this project into a more advanced tactical AI system capable of handling:
-
-- Positioning strategy
-- Threat analysis
-- Multi-target evaluation
-- Advanced combat heuristics
-- Integration with a tactical simulation or game environment
-
----
-
-## Author
-
-Developed as a portfolio project focused on **Game AI, Decision Systems, and Tactical Simulation using Python**.
+AUTHOR
+Developed as a portfolio project focused on TACTICAL AI, DECISION SYSTEMS, and GAME INTEGRATION.
