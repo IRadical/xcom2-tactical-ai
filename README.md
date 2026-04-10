@@ -1,29 +1,3 @@
-¡Entendido, Rad! Vamos a darle ese formato de ingeniería para que lo subas a tu repo de una vez. Aquí tienes los datos exactos para el comando de Git y la descripción del Pull Request.
-
-BRANCH NAME
-docs/standardize-tactical-blueprint
-
-COMMIT MESSAGE (CONVENTIONAL COMMITS)
-docs: standardize README architecture with high-visibility formatting
-
-PULL REQUEST DESCRIPTION / BODY
-SUMMARY:
-This PR performs a major structural and visual overhaul of the project's documentation. The goal is to align the XCOM 2 TACTICAL AI BRIDGE with professional portfolio standards, emphasizing the hybrid architecture between Python and UnrealScript.
-
-KEY UPDATES:
-
-VISUAL HIERARCHY: Implemented a "Mayus/Show" formatting style for headers and critical technical terms to improve scannability.
-
-ARCHITECTURE MAPPING: Formally documented the SRC/ directory structure, clarifying the roles of the AI CORE and the INTEGRATION BRIDGE.
-
-TECHNICAL TRANSPARENCY: Clearly identified current system limitations (LOS/Visibility) to provide a roadmap for future offensive logic implementation.
-
-OPERATIONAL GUIDE: Standardized the "How to Run" section for end-to-end testing of the bridge and simulation layers.
-
-IMPACT:
-The repository now serves as a high-visibility technical blueprint, clearly communicating the project's state, motivation, and future milestones to any senior engineer or reviewer.
-
-README.MD (MARKDOWN COMPLETO PARA COPIAR)
 Markdown
 # XCOM 2 TACTICAL AI BRIDGE
 
